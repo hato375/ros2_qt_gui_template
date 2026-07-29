@@ -66,12 +66,18 @@ cd /home/ros/ros2_qt_gui_template
 新しい開発者は、最初に対話形式のセットアップスクリプトを使用できます。
 
 ```bash
-cd /home/ros/ros2_qt_gui_template
+svn checkout <repository-url>/ros2_qt_gui_template
+mv ros2_qt_gui_template ros2_test
+cd ros2_test
 ./setup_dev.sh
 ```
 
 スクリプトは次の処理を支援します。
 
+- 現在のフォルダ名をプロジェクト名として検出する
+- プロジェクト名が`^[a-z][a-z0-9_]*$`に適合することを確認する
+- workspaceファイル名と資料内のテンプレート名をプロジェクト名へ変更する
+- `.project_setup`へ初期化済みのプロジェクト名を記録し、二重初期化を防止する
 - Gitの名前とメールアドレスを入力し、現在のリポジトリだけへ設定する
 - Gitリポジトリがない場合は、確認後に`main`ブランチで初期化する
 - Ubuntu 22.04、ROS 2 Humble、および必要なコマンドを確認する
@@ -81,6 +87,39 @@ cd /home/ros/ros2_qt_gui_template
 - 最後に`check_environment.sh`を実行する
 
 Git設定には`--local`を使用するため、開発者のグローバルGit設定は変更しません。
+
+#### プロジェクト名の規則
+
+プロジェクト名には、小文字英字で始まる小文字英数字とアンダースコアだけを使用します。
+
+```text
+使用可能: ros2_test、camera_viewer、robot_controller
+使用不可: ROS2-Test、robot app、画像ビューア
+```
+
+#### 自動変更しない名称
+
+初期セットアップでは、次の名称を自動変更しません。
+
+| 対象 | テンプレートの名称 |
+|---|---|
+| ROSパッケージ | `ros2_qt_gui` |
+| 実行ファイル | `ros2_qt_gui` |
+| ROSノード | `ros2_qt_gui_node` |
+| C++名前空間 | `ros2qtgui` |
+
+これらはアプリケーションの公開インターフェースや多数のソースファイルに影響するため、単純な文字列置換を
+行いません。プロジェクト固有の名称が必要な場合は、開発者が影響範囲を確認して個別に変更してください。
+
+変更時は、少なくとも次のファイルと参照箇所を確認します。
+
+- `src/ros2_qt_gui/package.xml`
+- `src/ros2_qt_gui/CMakeLists.txt`
+- `src/ros2_qt_gui/launch/ros2_qt_gui.launch.py`
+- `src/ros2_qt_gui/src/main.cpp`
+- `src/ros2_qt_gui/src/ros_node.cpp`
+- `src/ros2_qt_gui/include/`
+- README、セットアップガイド、Qt Creatorの実行設定
 
 手動でビルドする場合は、プロジェクトルートで次のコマンドを実行します。
 

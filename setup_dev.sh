@@ -5,6 +5,8 @@ set -euo pipefail
 readonly PROJECT_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 readonly ROS_DISTRO_NAME="humble"
 readonly ROS_SETUP="/opt/ros/${ROS_DISTRO_NAME}/setup.bash"
+readonly TEMPLATE_NAME="ros2_qt_gui_template"
+readonly PROJECT_SETUP_FILE="${PROJECT_ROOT}/.project_setup"
 
 printSection() {
 	printf '\n== %s ==\n' "$1"
@@ -62,6 +64,90 @@ readRequiredValue() {
 
 		printf 'A value is required.\n' >&2
 	done
+}
+
+initializeProject() {
+	printSection "Project initialization"
+
+	local projectName
+	local configuredProjectName
+	local templateWorkspace
+	local projectWorkspace
+	local readmeFile
+	local setupGuideFile
+
+	projectName="$(basename -- "${PROJECT_ROOT}")"
+	if [[ ! "${projectName}" =~ ^[a-z][a-z0-9_]*$ ]]; then
+		printError "Invalid project directory name: ${projectName}"
+		printf 'Use lowercase letters, numbers, and underscores, starting with a letter.\n' >&2
+		printf 'Example: ros2_test\n' >&2
+		exit 1
+	fi
+
+	if [[ "${projectName}" == "${TEMPLATE_NAME}" ]]; then
+		printError "Rename the template directory before running this script."
+		printf 'Example:\n' >&2
+		printf '  mv %s ros2_test\n' "${TEMPLATE_NAME}" >&2
+		printf '  cd ros2_test\n' >&2
+		printf '  ./setup_dev.sh\n' >&2
+		exit 1
+	fi
+
+	if [[ -f "${PROJECT_SETUP_FILE}" ]]; then
+		configuredProjectName="$(
+			sed -n 's/^PROJECT_NAME=//p' "${PROJECT_SETUP_FILE}" | head -n 1
+		)"
+		if [[ "${configuredProjectName}" != "${projectName}" ]]; then
+			printError "The project directory was renamed after initialization."
+			printf 'Configured name: %s\n' "${configuredProjectName}" >&2
+			printf 'Directory name:  %s\n' "${projectName}" >&2
+			exit 1
+		fi
+
+		printf 'Project is already initialized: %s\n' "${projectName}"
+		return
+	fi
+
+	templateWorkspace="${PROJECT_ROOT}/${TEMPLATE_NAME}.workspace"
+	projectWorkspace="${PROJECT_ROOT}/${projectName}.workspace"
+	readmeFile="${PROJECT_ROOT}/README.md"
+	setupGuideFile="${PROJECT_ROOT}/docs/development_setup_guide.md"
+
+	printf 'Detected project name: %s\n' "${projectName}"
+	printf 'The following changes will be made:\n'
+	printf '  %s -> %s\n' \
+		"$(basename -- "${templateWorkspace}")" \
+		"$(basename -- "${projectWorkspace}")"
+	printf '  Replace workspace paths for %s with %s in project documentation.\n' \
+		"${TEMPLATE_NAME}" "${projectName}"
+
+	if ! confirm "Initialize this project?" "y"; then
+		printError "Project initialization was canceled."
+		exit 1
+	fi
+
+	if [[ -f "${templateWorkspace}" ]]; then
+		mv "${templateWorkspace}" "${projectWorkspace}"
+	elif [[ ! -f "${projectWorkspace}" ]]; then
+		printError "Workspace file was not found: ${templateWorkspace}"
+		exit 1
+	fi
+
+	if [[ ! -f "${readmeFile}" || ! -f "${setupGuideFile}" ]]; then
+		printError "README.md or development_setup_guide.md was not found."
+		exit 1
+	fi
+
+	sed -i \
+		"s#/home/ros/${TEMPLATE_NAME}#/home/ros/${projectName}#g" \
+		"${readmeFile}" "${setupGuideFile}"
+	sed -i \
+		"s/${TEMPLATE_NAME}\\.workspace/${projectName}.workspace/g" \
+		"${setupGuideFile}"
+
+	printf 'PROJECT_NAME=%s\n' "${projectName}" > "${PROJECT_SETUP_FILE}"
+	printf 'TEMPLATE_NAME=%s\n' "${TEMPLATE_NAME}" >> "${PROJECT_SETUP_FILE}"
+	printf 'Project initialized: %s\n' "${projectName}"
 }
 
 configureGit() {
@@ -174,6 +260,7 @@ main() {
 		exit 1
 	fi
 
+	initializeProject
 	configureGit
 
 	printSection "Development dependencies"
