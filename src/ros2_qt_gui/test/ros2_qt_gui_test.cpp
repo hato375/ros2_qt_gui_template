@@ -84,6 +84,46 @@ TEST(RosQtBridgeTest, DeliversNotificationOnQtThread) {
 	EXPECT_EQ(receiver.receiverThread(), QThread::currentThread());
 }
 
+TEST(RosNodeParameterTest, UsesDefaultValues) {
+	auto node = std::make_shared<ros2qtgui::RosNode>([](std::uint64_t) {
+	});
+
+	EXPECT_EQ(node->heartbeatIntervalMs(), 1000);
+	EXPECT_EQ(node->guiStatusCheckIntervalMs(), 200);
+
+	const auto result = node->set_parameter(rclcpp::Parameter("heartbeat_interval_ms", 500));
+	EXPECT_FALSE(result.successful);
+}
+
+TEST(RosNodeParameterTest, UsesOverrideValues) {
+	rclcpp::NodeOptions options;
+	options.parameter_overrides({
+		rclcpp::Parameter("heartbeat_interval_ms", 250),
+		rclcpp::Parameter("gui_status_check_interval_ms", 100),
+	});
+	auto node = std::make_shared<ros2qtgui::RosNode>(
+		[](std::uint64_t) {
+		},
+		options);
+
+	EXPECT_EQ(node->heartbeatIntervalMs(), 250);
+	EXPECT_EQ(node->guiStatusCheckIntervalMs(), 100);
+}
+
+TEST(RosNodeParameterTest, RejectsOutOfRangeValues) {
+	rclcpp::NodeOptions options;
+	options.parameter_overrides({
+		rclcpp::Parameter("heartbeat_interval_ms", 99),
+	});
+
+	EXPECT_ANY_THROW({
+		auto node = std::make_shared<ros2qtgui::RosNode>(
+			[](std::uint64_t) {
+			},
+			options);
+	});
+}
+
 TEST(RosExecutorRunnerTest, DeliversHeartbeatAndStopsSafely) {
 	ros2qtgui::RosQtBridge bridge;
 	HeartbeatReceiver receiver;

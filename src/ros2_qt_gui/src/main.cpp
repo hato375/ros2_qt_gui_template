@@ -22,7 +22,8 @@ int main(int argc, char* argv[]) {
 			rosQtBridge.notifyHeartbeat(count);
 		});
 
-		ros2qtgui::MainWindow mainWindow;
+		ros2qtgui::MainWindow mainWindow(
+			static_cast<int>(rosNode->guiStatusCheckIntervalMs()));
 		QObject::connect(
 			&rosQtBridge,
 			&ros2qtgui::RosQtBridge::heartbeatUpdated,

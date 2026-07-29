@@ -14,12 +14,25 @@ public:
 
 	/// @brief ROS 2ノードを生成する
 	/// @param heartbeatCallback ハートビート更新時に呼び出す関数
-	explicit RosNode(HeartbeatCallback heartbeatCallback);
+	/// @param options ROS 2ノードの生成オプション
+	explicit RosNode(
+		HeartbeatCallback heartbeatCallback,
+		const rclcpp::NodeOptions& options = rclcpp::NodeOptions());
+
+	/// @brief ハートビート周期を取得する
+	/// @return ハートビート周期（ミリ秒）
+	std::int64_t heartbeatIntervalMs() const noexcept;
+
+	/// @brief GUI状態確認周期を取得する
+	/// @return GUI状態確認周期（ミリ秒）
+	std::int64_t guiStatusCheckIntervalMs() const noexcept;
 
 private:
 	void onHeartbeat() noexcept;
 
 	HeartbeatCallback heartbeatCallback_;
+	std::int64_t heartbeatIntervalMs_;
+	std::int64_t guiStatusCheckIntervalMs_;
 	std::uint64_t heartbeatCount_;
 	rclcpp::TimerBase::SharedPtr heartbeatTimer_;
 };

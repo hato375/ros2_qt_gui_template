@@ -10,7 +10,7 @@
 
 namespace ros2qtgui {
 
-MainWindow::MainWindow()
+MainWindow::MainWindow(int statusCheckIntervalMs)
 	: statusLabel_(new QLabel(tr("ROS 2 status: running"), this)),
 	  heartbeatLabel_(new QLabel(this)),
 	  statusTimer_(new QTimer(this)) {
@@ -28,7 +28,7 @@ MainWindow::MainWindow()
 	connect(statusTimer_, &QTimer::timeout, this, [this]() {
 		updateRosStatus();
 	});
-	statusTimer_->start(200);
+	statusTimer_->start(statusCheckIntervalMs);
 	setHeartbeatCount(0);
 	updateRosStatus();
 }

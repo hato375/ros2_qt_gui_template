@@ -39,6 +39,24 @@ ros2 run ros2_qt_gui ros2_qt_gui
 
 ウィンドウ内の`ROS heartbeat count`が1秒ごとに増えれば、ROS 2 ExecutorとQt GUIの連携は正常です。
 
+## パラメータ
+
+既定値は`config/ros2_qt_gui.yaml`に定義されています。
+
+```yaml
+ros2_qt_gui_node:
+  ros__parameters:
+    heartbeat_interval_ms: 1000
+    gui_status_check_interval_ms: 200
+```
+
+別の設定ファイルを指定できます。
+
+```bash
+ros2 launch ros2_qt_gui ros2_qt_gui.launch.py \
+  params_file:=/path/to/custom.yaml
+```
+
 ## テスト
 
 ```bash

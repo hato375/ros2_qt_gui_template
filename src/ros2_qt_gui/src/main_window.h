@@ -11,7 +11,8 @@ namespace ros2qtgui {
 class MainWindow final : public QMainWindow {
 public:
 	/// @brief メインウィンドウを生成する
-	explicit MainWindow();
+	/// @param statusCheckIntervalMs ROS 2状態を確認する周期（ミリ秒）
+	explicit MainWindow(int statusCheckIntervalMs);
 
 	/// @brief ROS 2のハートビート表示を更新する
 	/// @param count ハートビート回数

@@ -107,6 +107,7 @@ Git設定には`--local`を使用するため、開発者のグローバルGit�
 | 実行ファイル | `ros2_qt_gui` |
 | ROSノード | `ros2_qt_gui_node` |
 | C++名前空間 | `ros2qtgui` |
+| パラメータYAML | `ros2_qt_gui.yaml` |
 
 これらはアプリケーションの公開インターフェースや多数のソースファイルに影響するため、単純な文字列置換を
 行いません。プロジェクト固有の名称が必要な場合は、開発者が影響範囲を確認して個別に変更してください。
@@ -116,6 +117,7 @@ Git設定には`--local`を使用するため、開発者のグローバルGit�
 - `src/ros2_qt_gui/package.xml`
 - `src/ros2_qt_gui/CMakeLists.txt`
 - `src/ros2_qt_gui/launch/ros2_qt_gui.launch.py`
+- `src/ros2_qt_gui/config/ros2_qt_gui.yaml`
 - `src/ros2_qt_gui/src/main.cpp`
 - `src/ros2_qt_gui/src/ros_node.cpp`
 - `src/ros2_qt_gui/src/`
@@ -156,7 +158,36 @@ ros2 run ros2_qt_gui ros2_qt_gui
 
 GUI上の`ROS heartbeat count`が1秒ごとに増加すれば、QtとROS 2 Executorは正常に連携しています。
 
-### 5.1 自動テスト
+### 5.1 ROSパラメータ
+
+既定のパラメータは次のファイルに定義します。
+
+```text
+src/ros2_qt_gui/config/ros2_qt_gui.yaml
+```
+
+| パラメータ | 既定値 | 範囲 | 用途 |
+|---|---:|---:|---|
+| `heartbeat_interval_ms` | 1000 | 100～60000 | ROSハートビート周期 |
+| `gui_status_check_interval_ms` | 200 | 50～10000 | GUIによるROS状態確認周期 |
+
+パラメータは起動時に確定する読み取り専用設定です。別のYAMLを指定する場合は次のように起動します。
+
+```bash
+ros2 launch ros2_qt_gui ros2_qt_gui.launch.py \
+  params_file:=/path/to/custom.yaml
+```
+
+`ros2_qt_gui.yaml`はアプリケーション固有の名前を含みます。アプリケーション名へ変更する場合は、
+次の3か所を同時に確認してください。
+
+1. `config/ros2_qt_gui.yaml`のファイル名
+2. YAML内のノード名`ros2_qt_gui_node`
+3. `launch/ros2_qt_gui.launch.py`の既定ファイル名とノード名
+
+YAML内のノード名と実際に起動するノード名が一致しない場合、設定値が適用されません。
+
+### 5.2 自動テスト
 
 ビルド後、次のコマンドで自動テストを実行します。
 
@@ -171,6 +202,8 @@ colcon test-result --verbose
 - ROS Executorとは別のスレッドから送信した通知がQtスレッドで処理される
 - ROSタイマーのハートビートがqueued connection経由で到達する
 - Executorを複数回停止しても安全に終了する
+- パラメータの既定値と上書き値が適用される
+- 範囲外の値と実行中の変更が拒否される
 
 ## 6. Qt Creatorの起動
 
