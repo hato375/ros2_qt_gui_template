@@ -63,7 +63,26 @@ cd /home/ros/ros2_qt_gui_template
 
 ## 4. 初回ビルド
 
-プロジェクトルートで次のコマンドを実行します。
+新しい開発者は、最初に対話形式のセットアップスクリプトを使用できます。
+
+```bash
+cd /home/ros/ros2_qt_gui_template
+./setup_dev.sh
+```
+
+スクリプトは次の処理を支援します。
+
+- Gitの名前とメールアドレスを入力し、現在のリポジトリだけへ設定する
+- Gitリポジトリがない場合は、確認後に`main`ブランチで初期化する
+- Ubuntu 22.04、ROS 2 Humble、および必要なコマンドを確認する
+- Qt 5 Widgetsがない場合は、確認後にインストールする
+- 確認後に`rosdep`でROSパッケージの依存関係を解決する
+- 確認後に`colcon build`を実行する
+- 最後に`check_environment.sh`を実行する
+
+Git設定には`--local`を使用するため、開発者のグローバルGit設定は変更しません。
+
+手動でビルドする場合は、プロジェクトルートで次のコマンドを実行します。
 
 ```bash
 cd /home/ros/ros2_qt_gui_template
