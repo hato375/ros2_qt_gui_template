@@ -1,4 +1,4 @@
-#include "ros2_qt_gui/ros_node.h"
+#include "ros_node.h"
 
 #include <chrono>
 #include <exception>

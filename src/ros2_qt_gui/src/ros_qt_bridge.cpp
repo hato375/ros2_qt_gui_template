@@ -1,4 +1,4 @@
-#include "ros2_qt_gui/ros_qt_bridge.h"
+#include "ros_qt_bridge.h"
 
 namespace ros2qtgui {
 

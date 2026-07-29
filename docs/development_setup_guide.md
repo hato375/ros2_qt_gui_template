@@ -118,7 +118,7 @@ Git設定には`--local`を使用するため、開発者のグローバルGit�
 - `src/ros2_qt_gui/launch/ros2_qt_gui.launch.py`
 - `src/ros2_qt_gui/src/main.cpp`
 - `src/ros2_qt_gui/src/ros_node.cpp`
-- `src/ros2_qt_gui/include/`
+- `src/ros2_qt_gui/src/`
 - README、セットアップガイド、Qt Creatorの実行設定
 
 手動でビルドする場合は、プロジェクトルートで次のコマンドを実行します。

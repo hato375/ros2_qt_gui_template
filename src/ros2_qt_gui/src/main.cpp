@@ -7,10 +7,10 @@
 
 #include <rclcpp/rclcpp.hpp>
 
-#include "ros2_qt_gui/main_window.h"
-#include "ros2_qt_gui/ros_executor_runner.h"
-#include "ros2_qt_gui/ros_node.h"
-#include "ros2_qt_gui/ros_qt_bridge.h"
+#include "main_window.h"
+#include "ros_executor_runner.h"
+#include "ros_node.h"
+#include "ros_qt_bridge.h"
 
 int main(int argc, char* argv[]) {
 	rclcpp::init(argc, argv);

@@ -1,4 +1,4 @@
-#include "ros2_qt_gui/main_window.h"
+#include "main_window.h"
 
 #include <QApplication>
 #include <QLabel>

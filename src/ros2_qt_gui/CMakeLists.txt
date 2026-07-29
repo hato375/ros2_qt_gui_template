@@ -13,7 +13,7 @@ find_package(rclcpp REQUIRED)
 find_package(Qt5 REQUIRED COMPONENTS Widgets)
 
 add_executable(${PROJECT_NAME}
-	include/ros2_qt_gui/ros_qt_bridge.h
+	src/ros_qt_bridge.h
 	src/main.cpp
 	src/main_window.cpp
 	src/ros_executor_runner.cpp
@@ -21,7 +21,6 @@ add_executable(${PROJECT_NAME}
 	src/ros_qt_bridge.cpp
 )
 
-target_include_directories(${PROJECT_NAME} PRIVATE include)
 target_link_libraries(${PROJECT_NAME} Qt5::Widgets)
 ament_target_dependencies(${PROJECT_NAME} rclcpp)
 
