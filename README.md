@@ -39,6 +39,16 @@ ros2 run ros2_qt_gui ros2_qt_gui
 
 ウィンドウ内の`ROS heartbeat count`が1秒ごとに増えれば、ROS 2 ExecutorとQt GUIの連携は正常です。
 
+## テスト
+
+```bash
+source /opt/ros/humble/setup.bash
+colcon test --packages-select ros2_qt_gui
+colcon test-result --verbose
+```
+
+テストでは、ROSスレッドからQtスレッドへのqueued connectionと、Executorの安全な停止を確認します。
+
 ## Qt Creator
 
 ビルド後、プロジェクトルートのスクリプトを実行すると、ROS 2とこのワークスペースの環境を設定して

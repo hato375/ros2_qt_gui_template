@@ -156,6 +156,22 @@ ros2 run ros2_qt_gui ros2_qt_gui
 
 GUI上の`ROS heartbeat count`が1秒ごとに増加すれば、QtとROS 2 Executorは正常に連携しています。
 
+### 5.1 自動テスト
+
+ビルド後、次のコマンドで自動テストを実行します。
+
+```bash
+source /opt/ros/humble/setup.bash
+colcon test --packages-select ros2_qt_gui
+colcon test-result --verbose
+```
+
+現在のテストは次を確認します。
+
+- ROS Executorとは別のスレッドから送信した通知がQtスレッドで処理される
+- ROSタイマーのハートビートがqueued connection経由で到達する
+- Executorを複数回停止しても安全に終了する
+
 ## 6. Qt Creatorの起動
 
 Qt Creatorは、ROS 2と現在のプロジェクトの環境を読み込んだ状態で起動する必要があります。

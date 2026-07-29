@@ -30,6 +30,28 @@ elseif(MSVC)
 	target_compile_options(${PROJECT_NAME} PRIVATE /W4)
 endif()
 
+if(BUILD_TESTING)
+	find_package(ament_cmake_gtest REQUIRED)
+
+	ament_add_gtest(ros2_qt_gui_test
+		SKIP_LINKING_MAIN_LIBRARIES
+		test/ros2_qt_gui_test.cpp
+		src/ros_executor_runner.cpp
+		src/ros_node.cpp
+		src/ros_qt_bridge.cpp
+		src/ros_qt_bridge.h
+	)
+	target_include_directories(ros2_qt_gui_test PRIVATE src)
+	target_link_libraries(ros2_qt_gui_test Qt5::Core)
+	ament_target_dependencies(ros2_qt_gui_test rclcpp)
+
+	if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+		target_compile_options(ros2_qt_gui_test PRIVATE -Wall -Wextra -Wpedantic)
+	elseif(MSVC)
+		target_compile_options(ros2_qt_gui_test PRIVATE /W4)
+	endif()
+endif()
+
 install(TARGETS ${PROJECT_NAME}
 	DESTINATION lib/${PROJECT_NAME}
 )
