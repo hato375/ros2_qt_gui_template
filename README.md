@@ -1,0 +1,74 @@
+# ROS 2 + Qt GUI
+
+ROS 2ノードとして起動し、Qt 5のGUIを表示する最小構成のアプリケーションです。
+Qtのイベントループはメインスレッド、ROS 2 Executorは専用スレッドで実行します。
+
+## 必要な環境
+
+- ROS 2 Humble
+- Qt 5 Widgets
+- C++17対応コンパイラ
+
+UbuntuではQtの開発パッケージを次のように導入できます。
+
+```bash
+sudo apt install qtbase5-dev
+```
+
+## ビルド
+
+```bash
+source /opt/ros/humble/setup.bash
+colcon build --packages-select ros2_qt_gui
+source install/setup.bash
+```
+
+## 起動
+
+ROS 2のlaunchファイルから起動します。
+
+```bash
+ros2 launch ros2_qt_gui ros2_qt_gui.launch.py
+```
+
+または、実行ファイルを直接起動できます。
+
+```bash
+ros2 run ros2_qt_gui ros2_qt_gui
+```
+
+ウィンドウ内の`ROS heartbeat count`が1秒ごとに増えれば、ROS 2 ExecutorとQt GUIの連携は正常です。
+
+## Qt Creator
+
+ビルド後、プロジェクトルートのスクリプトを実行すると、ROS 2とこのワークスペースの環境を設定して
+Qt Creatorを起動できます。スクリプトはどのディレクトリからでも実行できます。
+
+```bash
+/home/ros/ros2_qt_gui_template/open_qtcreator.sh
+```
+
+別のワークスペースで使用する場合も、スクリプトをそのプロジェクトルートへコピーするだけで使用できます。
+プロジェクトルートには`.workspace`ファイルが1つだけ存在する必要があります。
+
+Qt Creatorが標準の場所にない場合は、環境変数で実行ファイルを指定できます。
+
+```bash
+QT_CREATOR_EXECUTABLE=/path/to/qtcreator ./open_qtcreator.sh
+```
+
+## 環境診断
+
+開発環境を変更せずに、ROS 2、Qt、コンパイラ、Qt Creator、ワークスペースなどの状態を確認できます。
+
+```bash
+./check_environment.sh
+```
+
+必須項目に問題がある場合は終了コード`1`、警告だけの場合は終了コード`0`を返します。
+
+## ドキュメント
+
+- [開発環境セットアップガイド](docs/development_setup_guide.md)
+- [アーキテクチャ・開発ガイド](docs/architecture_and_development_guidelines.md)
+- [AIエージェント向け基本プロンプト](prompts/ros2_qt_gui_agent_prompt.md)

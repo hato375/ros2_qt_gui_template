@@ -1,0 +1,54 @@
+# ROS 2 / colconの生成物
+/build/
+/install/
+/log/
+
+# Subversionの管理情報
+.svn/
+
+# Qt Creatorのユーザー固有設定
+/.qtcreator/
+*.workspace.user
+*.workspace.user.*
+*.user
+*.user.*
+.qtc_clangd/
+
+# CMakeの生成物
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+CTestTestfile.cmake
+Makefile
+compile_commands.json
+Testing/
+
+# C/C++のコンパイル生成物
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.so.*
+*.dll
+*.dylib
+*.exe
+*.pdb
+
+# テスト・カバレッジの生成物
+/coverage/
+*.gcda
+*.gcno
+*.gcov
+
+# ログ・クラッシュダンプ
+*.log
+core
+core.*
+
+# エディタとOSの一時ファイル
+*~
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
