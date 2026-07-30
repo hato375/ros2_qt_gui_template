@@ -211,6 +211,7 @@ colcon test-result --verbose
 - ROSタイマーのハートビートがqueued connection経由で到達する
 - Stringトピックの初回受信、タイムアウト、および復旧が検出される
 - 高頻度な受信状況のGUI通知が一定周期に集約される
+- 共通の`TopicReceptionMonitor`が最新値だけを保持し、状態遷移を通知する
 - Executorを複数回停止しても安全に終了する
 - パラメータの既定値と上書き値が適用される
 - 範囲外の値と実行中の変更が拒否される

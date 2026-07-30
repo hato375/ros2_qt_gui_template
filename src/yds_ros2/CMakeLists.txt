@@ -13,6 +13,7 @@ find_package(Qt5 REQUIRED COMPONENTS Core)
 
 add_library(${PROJECT_NAME}
 	src/executor_runner.cpp
+	src/topic_reception_monitor.cpp
 )
 
 target_include_directories(${PROJECT_NAME}
@@ -34,6 +35,7 @@ if(BUILD_TESTING)
 
 	ament_add_gtest(yds_ros2_test
 		test/executor_runner_test.cpp
+		test/topic_reception_monitor_test.cpp
 	)
 	target_link_libraries(yds_ros2_test ${PROJECT_NAME})
 	ament_target_dependencies(yds_ros2_test rclcpp)

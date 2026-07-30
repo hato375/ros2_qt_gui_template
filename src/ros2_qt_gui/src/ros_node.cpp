@@ -95,15 +95,13 @@ RosNode::RosNode(
 			  "Topic reception timeout in milliseconds.",
 			  kMinimumTopicReceptionTimeoutMs,
 			  kMaximumTopicReceptionTimeoutMs))),
-	  heartbeatCount_(0),
-	  topicReceptionStatus_({
+	  topicReceptionMonitor_(
 		  QString::fromStdString(monitoredTopic_),
-		  yds::ros2::TopicReceptionState::kWaiting,
-		  QDateTime(),
-		  0,
-		  QString()}),
-	  lastTopicReceptionTime_(),
-	  topicReceptionStatusDirty_(false) {
+		  std::chrono::milliseconds(topicReceptionTimeoutMs_)),
+	  heartbeatCount_(0),
+	  heartbeatTimer_(),
+	  monitoredTopicSubscription_(),
+	  topicReceptionStatusTimer_() {
 	validateInterval(
 		"heartbeat_interval_ms",
 		heartbeatIntervalMs_,
@@ -184,69 +182,42 @@ void RosNode::onHeartbeat() noexcept {
 }
 
 void RosNode::onMonitoredTopic(const std_msgs::msg::String::SharedPtr message) noexcept {
-	const bool isFirstReception =
-		topicReceptionStatus_.state == yds::ros2::TopicReceptionState::kWaiting;
-	const bool isRecovery =
-		topicReceptionStatus_.state == yds::ros2::TopicReceptionState::kTimedOut;
-
-	topicReceptionStatus_.state = yds::ros2::TopicReceptionState::kReceiving;
-	topicReceptionStatus_.lastReceivedAt = QDateTime::currentDateTime();
-	++topicReceptionStatus_.receivedCount;
-	topicReceptionStatus_.lastMessage = QString::fromStdString(message->data);
-	lastTopicReceptionTime_ = std::chrono::steady_clock::now();
-	topicReceptionStatusDirty_ = true;
-
-	if (isFirstReception) {
-		RCLCPP_INFO(
+	try {
+		handleTopicReceptionTransition(
+			topicReceptionMonitor_.recordReception(QString::fromStdString(message->data)));
+	} catch (const std::exception& exception) {
+		RCLCPP_ERROR(
 			get_logger(),
-			"Topic reception started: %s",
-			monitoredTopic_.c_str());
+			"Failed to record topic reception: %s",
+			exception.what());
 		reportApplicationEvent(
-			yds::ros2::ApplicationEventLevel::kInfo,
-			QStringLiteral("Topic reception started: %1")
-				.arg(QString::fromStdString(monitoredTopic_)));
-	} else if (isRecovery) {
-		RCLCPP_INFO(
-			get_logger(),
-			"Topic reception recovered: %s",
-			monitoredTopic_.c_str());
+			yds::ros2::ApplicationEventLevel::kError,
+			QStringLiteral("Failed to record topic reception: %1")
+				.arg(exception.what()));
+	} catch (...) {
+		RCLCPP_ERROR(get_logger(), "Failed to record topic reception with an unknown error");
 		reportApplicationEvent(
-			yds::ros2::ApplicationEventLevel::kInfo,
-			QStringLiteral("Topic reception recovered: %1")
-				.arg(QString::fromStdString(monitoredTopic_)));
+			yds::ros2::ApplicationEventLevel::kError,
+			QStringLiteral("Failed to record topic reception with an unknown error"));
 	}
 }
 
 void RosNode::updateTopicReceptionStatus() noexcept {
-	if (topicReceptionStatus_.state == yds::ros2::TopicReceptionState::kReceiving) {
-		const auto elapsed = std::chrono::steady_clock::now() - lastTopicReceptionTime_;
-		if (elapsed >= std::chrono::milliseconds(topicReceptionTimeoutMs_)) {
-			topicReceptionStatus_.state = yds::ros2::TopicReceptionState::kTimedOut;
-			topicReceptionStatusDirty_ = true;
-			RCLCPP_WARN(
-				get_logger(),
-				"Topic reception timed out: %s",
-				monitoredTopic_.c_str());
-			reportApplicationEvent(
-				yds::ros2::ApplicationEventLevel::kWarning,
-				QStringLiteral("Topic reception timed out: %1")
-					.arg(QString::fromStdString(monitoredTopic_)));
-		}
-	}
-
-	if (topicReceptionStatusDirty_) {
-		notifyTopicReceptionStatus();
-	}
+	handleTopicReceptionTransition(topicReceptionMonitor_.checkTimeout());
+	notifyTopicReceptionStatus();
 }
 
 void RosNode::notifyTopicReceptionStatus() noexcept {
-	topicReceptionStatusDirty_ = false;
 	if (!topicReceptionStatusCallback_) {
 		return;
 	}
 
 	try {
-		topicReceptionStatusCallback_(topicReceptionStatus_);
+		auto status = topicReceptionMonitor_.takeStatusUpdate();
+		if (!status) {
+			return;
+		}
+		topicReceptionStatusCallback_(*status);
 	} catch (const std::exception& exception) {
 		RCLCPP_ERROR(
 			get_logger(),
@@ -256,6 +227,44 @@ void RosNode::notifyTopicReceptionStatus() noexcept {
 		RCLCPP_ERROR(
 			get_logger(),
 			"Topic reception status callback failed with an unknown error");
+	}
+}
+
+void RosNode::handleTopicReceptionTransition(
+	yds::ros2::TopicReceptionTransition transition) noexcept {
+	switch (transition) {
+	case yds::ros2::TopicReceptionTransition::kNone:
+		return;
+	case yds::ros2::TopicReceptionTransition::kStarted:
+		RCLCPP_INFO(
+			get_logger(),
+			"Topic reception started: %s",
+			monitoredTopic_.c_str());
+		reportApplicationEvent(
+			yds::ros2::ApplicationEventLevel::kInfo,
+			QStringLiteral("Topic reception started: %1")
+				.arg(QString::fromStdString(monitoredTopic_)));
+		return;
+	case yds::ros2::TopicReceptionTransition::kTimedOut:
+		RCLCPP_WARN(
+			get_logger(),
+			"Topic reception timed out: %s",
+			monitoredTopic_.c_str());
+		reportApplicationEvent(
+			yds::ros2::ApplicationEventLevel::kWarning,
+			QStringLiteral("Topic reception timed out: %1")
+				.arg(QString::fromStdString(monitoredTopic_)));
+		return;
+	case yds::ros2::TopicReceptionTransition::kRecovered:
+		RCLCPP_INFO(
+			get_logger(),
+			"Topic reception recovered: %s",
+			monitoredTopic_.c_str());
+		reportApplicationEvent(
+			yds::ros2::ApplicationEventLevel::kInfo,
+			QStringLiteral("Topic reception recovered: %1")
+				.arg(QString::fromStdString(monitoredTopic_)));
+		return;
 	}
 }
 

@@ -26,6 +26,8 @@ source install/setup.bash
 ワークスペースには、GUIアプリケーションの`ros2_qt_gui`と、共通ROS 2ライブラリの`yds_ros2`が
 含まれます。`yds_ros2`の公開APIは`yds::ros2`名前空間と`yds/ros2`インクルードパスを使用します。
 共通ライブラリでもQt Core型を基本とし、ROS APIが標準C++型を要求する境界で必要な変換を行います。
+`yds::ros2::TopicReceptionMonitor`はROSメッセージ型に依存せず、camera、PLC、Supervisorなどの
+ノードから共通利用できます。
 
 ## 起動
 

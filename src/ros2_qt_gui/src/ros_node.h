@@ -1,6 +1,5 @@
 #pragma once
 
-#include <chrono>
 #include <cstdint>
 #include <functional>
 #include <string>
@@ -9,6 +8,7 @@
 #include <std_msgs/msg/string.hpp>
 
 #include <yds/ros2/application_event.h>
+#include <yds/ros2/topic_reception_monitor.h>
 #include <yds/ros2/topic_reception_status.h>
 
 namespace ros2qtgui {
@@ -54,6 +54,8 @@ private:
 	void onMonitoredTopic(const std_msgs::msg::String::SharedPtr message) noexcept;
 	void updateTopicReceptionStatus() noexcept;
 	void notifyTopicReceptionStatus() noexcept;
+	void handleTopicReceptionTransition(
+		yds::ros2::TopicReceptionTransition transition) noexcept;
 	void reportApplicationEvent(
 		yds::ros2::ApplicationEventLevel level,
 		const QString& message) noexcept;
@@ -65,13 +67,11 @@ private:
 	std::int64_t guiStatusCheckIntervalMs_;
 	std::string monitoredTopic_;
 	std::int64_t topicReceptionTimeoutMs_;
+	yds::ros2::TopicReceptionMonitor topicReceptionMonitor_;
 	std::uint64_t heartbeatCount_;
 	rclcpp::TimerBase::SharedPtr heartbeatTimer_;
 	rclcpp::Subscription<std_msgs::msg::String>::SharedPtr monitoredTopicSubscription_;
 	rclcpp::TimerBase::SharedPtr topicReceptionStatusTimer_;
-	yds::ros2::TopicReceptionStatus topicReceptionStatus_;
-	std::chrono::steady_clock::time_point lastTopicReceptionTime_;
-	bool topicReceptionStatusDirty_;
 };
 
 }  // namespace ros2qtgui
