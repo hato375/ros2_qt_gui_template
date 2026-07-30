@@ -3,15 +3,18 @@
 #include <memory>
 #include <thread>
 
-#include <QCoreApplication>
+#include <QApplication>
 #include <QElapsedTimer>
 #include <QEventLoop>
 #include <QObject>
+#include <QPlainTextEdit>
 #include <QThread>
 
 #include <gtest/gtest.h>
 #include <rclcpp/rclcpp.hpp>
 
+#include "application_event.h"
+#include "main_window.h"
 #include "ros_executor_runner.h"
 #include "ros_node.h"
 #include "ros_qt_bridge.h"
@@ -51,6 +54,38 @@ private:
 	const QThread* receiverThread_;
 };
 
+class ApplicationEventReceiver final : public QObject {
+public:
+	explicit ApplicationEventReceiver(QObject* parent = nullptr)
+		: QObject(parent),
+		  receivedCount_(0),
+		  receiverThread_(nullptr) {
+	}
+
+	void receiveApplicationEvent(const ros2qtgui::ApplicationEvent& event) {
+		++receivedCount_;
+		lastEvent_ = event;
+		receiverThread_ = QThread::currentThread();
+	}
+
+	int receivedCount() const noexcept {
+		return receivedCount_;
+	}
+
+	const ros2qtgui::ApplicationEvent& lastEvent() const noexcept {
+		return lastEvent_;
+	}
+
+	const QThread* receiverThread() const noexcept {
+		return receiverThread_;
+	}
+
+private:
+	int receivedCount_;
+	ros2qtgui::ApplicationEvent lastEvent_;
+	const QThread* receiverThread_;
+};
+
 bool waitFor(const std::function<bool()>& condition, int timeoutMilliseconds) {
 	QElapsedTimer timer;
 	timer.start();
@@ -84,6 +119,52 @@ TEST(RosQtBridgeTest, DeliversNotificationOnQtThread) {
 	EXPECT_EQ(receiver.receiverThread(), QThread::currentThread());
 }
 
+TEST(RosQtBridgeTest, DeliversApplicationEventOnQtThread) {
+	ros2qtgui::RosQtBridge bridge;
+	ApplicationEventReceiver receiver;
+	QObject::connect(
+		&bridge,
+		&ros2qtgui::RosQtBridge::applicationEventOccurred,
+		&receiver,
+		&ApplicationEventReceiver::receiveApplicationEvent,
+		Qt::QueuedConnection);
+
+	const QDateTime timestamp = QDateTime::currentDateTime();
+	std::thread notifier([&bridge, timestamp]() {
+		bridge.notifyApplicationEvent({
+			ros2qtgui::ApplicationEventLevel::kWarning,
+			timestamp,
+			QStringLiteral("Connection retry")});
+	});
+	notifier.join();
+
+	ASSERT_TRUE(waitFor([&receiver]() {
+		return receiver.receivedCount() == 1;
+	}, 1000));
+	EXPECT_EQ(receiver.lastEvent().level, ros2qtgui::ApplicationEventLevel::kWarning);
+	EXPECT_EQ(receiver.lastEvent().timestamp, timestamp);
+	EXPECT_EQ(receiver.lastEvent().message, QStringLiteral("Connection retry"));
+	EXPECT_EQ(receiver.receiverThread(), QThread::currentThread());
+}
+
+TEST(MainWindowTest, LimitsApplicationEventLogEntries) {
+	ros2qtgui::MainWindow mainWindow(200);
+	auto* eventLog = mainWindow.findChild<QPlainTextEdit*>(
+		QStringLiteral("applicationEventLog"));
+	ASSERT_NE(eventLog, nullptr);
+
+	for (int index = 0; index < 510; ++index) {
+		mainWindow.appendApplicationEvent({
+			ros2qtgui::ApplicationEventLevel::kInfo,
+			QDateTime::currentDateTime(),
+			QStringLiteral("Event %1").arg(index)});
+	}
+
+	EXPECT_EQ(eventLog->document()->blockCount(), 500);
+	EXPECT_FALSE(eventLog->toPlainText().contains(QStringLiteral("Event 0\n")));
+	EXPECT_TRUE(eventLog->toPlainText().contains(QStringLiteral("Event 509")));
+}
+
 TEST(RosNodeParameterTest, UsesDefaultValues) {
 	auto node = std::make_shared<ros2qtgui::RosNode>([](std::uint64_t) {
 	});
@@ -104,6 +185,7 @@ TEST(RosNodeParameterTest, UsesOverrideValues) {
 	auto node = std::make_shared<ros2qtgui::RosNode>(
 		[](std::uint64_t) {
 		},
+		ros2qtgui::RosNode::ApplicationEventCallback(),
 		options);
 
 	EXPECT_EQ(node->heartbeatIntervalMs(), 250);
@@ -120,6 +202,7 @@ TEST(RosNodeParameterTest, RejectsOutOfRangeValues) {
 		auto node = std::make_shared<ros2qtgui::RosNode>(
 			[](std::uint64_t) {
 			},
+			ros2qtgui::RosNode::ApplicationEventCallback(),
 			options);
 	});
 }
@@ -152,7 +235,8 @@ TEST(RosExecutorRunnerTest, DeliversHeartbeatAndStopsSafely) {
 }  // namespace
 
 int main(int argc, char* argv[]) {
-	QCoreApplication application(argc, argv);
+	qputenv("QT_QPA_PLATFORM", "offscreen");
+	QApplication application(argc, argv);
 	testing::InitGoogleTest(&argc, argv);
 
 	int rosArgumentCount = 0;

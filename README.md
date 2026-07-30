@@ -38,6 +38,8 @@ ros2 run ros2_qt_gui ros2_qt_gui
 ```
 
 ウィンドウ内の`ROS heartbeat count`が1秒ごとに増えれば、ROS 2 ExecutorとQt GUIの連携は正常です。
+起動や設定、エラーなどの重要イベントは、時刻と重要度とともにウィンドウ内へ表示されます。
+表示は最新500件に制限され、古いイベントから自動的に削除されます。
 
 ## パラメータ
 
@@ -65,7 +67,8 @@ colcon test --packages-select ros2_qt_gui
 colcon test-result --verbose
 ```
 
-テストでは、ROSスレッドからQtスレッドへのqueued connectionと、Executorの安全な停止を確認します。
+テストでは、ROSスレッドからQtスレッドへのqueued connection、イベントログの保持件数上限、
+およびExecutorの安全な停止を確認します。
 
 ## Qt Creator
 

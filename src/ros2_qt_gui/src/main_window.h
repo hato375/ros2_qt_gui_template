@@ -2,7 +2,10 @@
 
 #include <QMainWindow>
 
+#include "application_event.h"
+
 class QLabel;
+class QPlainTextEdit;
 class QTimer;
 
 namespace ros2qtgui {
@@ -18,11 +21,16 @@ public:
 	/// @param count ハートビート回数
 	void setHeartbeatCount(quint64 count) noexcept;
 
+	/// @brief アプリケーションイベントをログ表示へ追加する
+	/// @param event 表示するイベント
+	void appendApplicationEvent(const ApplicationEvent& event) noexcept;
+
 private:
 	void updateRosStatus() noexcept;
 
 	QLabel* statusLabel_;
 	QLabel* heartbeatLabel_;
+	QPlainTextEdit* eventLog_;
 	QTimer* statusTimer_;
 };
 

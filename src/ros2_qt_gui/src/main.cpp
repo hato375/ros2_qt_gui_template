@@ -18,9 +18,13 @@ int main(int argc, char* argv[]) {
 
 	try {
 		ros2qtgui::RosQtBridge rosQtBridge;
-		auto rosNode = std::make_shared<ros2qtgui::RosNode>([&rosQtBridge](std::uint64_t count) {
-			rosQtBridge.notifyHeartbeat(count);
-		});
+		auto rosNode = std::make_shared<ros2qtgui::RosNode>(
+			[&rosQtBridge](std::uint64_t count) {
+				rosQtBridge.notifyHeartbeat(count);
+			},
+			[&rosQtBridge](const ros2qtgui::ApplicationEvent& event) {
+				rosQtBridge.notifyApplicationEvent(event);
+			});
 
 		ros2qtgui::MainWindow mainWindow(
 			static_cast<int>(rosNode->guiStatusCheckIntervalMs()));
@@ -30,6 +34,23 @@ int main(int argc, char* argv[]) {
 			&mainWindow,
 			&ros2qtgui::MainWindow::setHeartbeatCount,
 			Qt::QueuedConnection);
+		QObject::connect(
+			&rosQtBridge,
+			&ros2qtgui::RosQtBridge::applicationEventOccurred,
+			&mainWindow,
+			&ros2qtgui::MainWindow::appendApplicationEvent,
+			Qt::QueuedConnection);
+
+		rosQtBridge.notifyApplicationEvent({
+			ros2qtgui::ApplicationEventLevel::kInfo,
+			QDateTime::currentDateTime(),
+			QStringLiteral("ROS 2 node started")});
+		rosQtBridge.notifyApplicationEvent({
+			ros2qtgui::ApplicationEventLevel::kInfo,
+			QDateTime::currentDateTime(),
+			QStringLiteral("Configuration: heartbeat_interval_ms=%1, gui_status_check_interval_ms=%2")
+				.arg(rosNode->heartbeatIntervalMs())
+				.arg(rosNode->guiStatusCheckIntervalMs())});
 
 		ros2qtgui::RosExecutorRunner executorRunner(rosNode);
 		mainWindow.show();

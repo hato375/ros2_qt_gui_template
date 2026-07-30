@@ -200,6 +200,8 @@ colcon test-result --verbose
 現在のテストは次を確認します。
 
 - ROS Executorとは別のスレッドから送信した通知がQtスレッドで処理される
+- アプリケーションイベントの内容と発生時刻がqueued connection経由でQtスレッドへ到達する
+- GUIのイベントログが最新500件に制限される
 - ROSタイマーのハートビートがqueued connection経由で到達する
 - Executorを複数回停止しても安全に終了する
 - パラメータの既定値と上書き値が適用される

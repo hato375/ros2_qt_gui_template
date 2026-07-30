@@ -50,9 +50,13 @@ void validateInterval(
 
 }  // namespace
 
-RosNode::RosNode(HeartbeatCallback heartbeatCallback, const rclcpp::NodeOptions& options)
+RosNode::RosNode(
+	HeartbeatCallback heartbeatCallback,
+	ApplicationEventCallback applicationEventCallback,
+	const rclcpp::NodeOptions& options)
 	: Node("ros2_qt_gui_node", options),
 	  heartbeatCallback_(std::move(heartbeatCallback)),
+	  applicationEventCallback_(std::move(applicationEventCallback)),
 	  heartbeatIntervalMs_(declare_parameter<std::int64_t>(
 		  "heartbeat_interval_ms",
 		  kDefaultHeartbeatIntervalMs,
@@ -106,8 +110,33 @@ void RosNode::onHeartbeat() noexcept {
 		heartbeatCallback_(heartbeatCount_);
 	} catch (const std::exception& exception) {
 		RCLCPP_ERROR(get_logger(), "Heartbeat callback failed: %s", exception.what());
+		reportApplicationEvent(
+			ApplicationEventLevel::kError,
+			QStringLiteral("Heartbeat callback failed: %1").arg(exception.what()));
 	} catch (...) {
 		RCLCPP_ERROR(get_logger(), "Heartbeat callback failed with an unknown error");
+		reportApplicationEvent(
+			ApplicationEventLevel::kError,
+			QStringLiteral("Heartbeat callback failed with an unknown error"));
+	}
+}
+
+void RosNode::reportApplicationEvent(
+	ApplicationEventLevel level,
+	const QString& message) noexcept {
+	if (!applicationEventCallback_) {
+		return;
+	}
+
+	try {
+		applicationEventCallback_({level, QDateTime::currentDateTime(), message});
+	} catch (const std::exception& exception) {
+		RCLCPP_ERROR(
+			get_logger(),
+			"Application event callback failed: %s",
+			exception.what());
+	} catch (...) {
+		RCLCPP_ERROR(get_logger(), "Application event callback failed with an unknown error");
 	}
 }
 

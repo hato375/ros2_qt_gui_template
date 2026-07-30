@@ -5,18 +5,23 @@
 
 #include <rclcpp/rclcpp.hpp>
 
+#include "application_event.h"
+
 namespace ros2qtgui {
 
 /// @brief GUIと連携するROS 2ノード
 class RosNode final : public rclcpp::Node {
 public:
 	using HeartbeatCallback = std::function<void(std::uint64_t)>;
+	using ApplicationEventCallback = std::function<void(const ApplicationEvent&)>;
 
 	/// @brief ROS 2ノードを生成する
 	/// @param heartbeatCallback ハートビート更新時に呼び出す関数
+	/// @param applicationEventCallback アプリケーションイベント発生時に呼び出す関数
 	/// @param options ROS 2ノードの生成オプション
 	explicit RosNode(
 		HeartbeatCallback heartbeatCallback,
+		ApplicationEventCallback applicationEventCallback = ApplicationEventCallback(),
 		const rclcpp::NodeOptions& options = rclcpp::NodeOptions());
 
 	/// @brief ハートビート周期を取得する
@@ -29,8 +34,10 @@ public:
 
 private:
 	void onHeartbeat() noexcept;
+	void reportApplicationEvent(ApplicationEventLevel level, const QString& message) noexcept;
 
 	HeartbeatCallback heartbeatCallback_;
+	ApplicationEventCallback applicationEventCallback_;
 	std::int64_t heartbeatIntervalMs_;
 	std::int64_t guiStatusCheckIntervalMs_;
 	std::uint64_t heartbeatCount_;
