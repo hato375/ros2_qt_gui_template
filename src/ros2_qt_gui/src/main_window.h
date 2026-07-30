@@ -7,6 +7,7 @@
 
 class QLabel;
 class QPlainTextEdit;
+class QTableWidget;
 class QTimer;
 
 namespace ros2qtgui {
@@ -36,11 +37,7 @@ private:
 
 	QLabel* statusLabel_;
 	QLabel* heartbeatLabel_;
-	QLabel* monitoredTopicLabel_;
-	QLabel* topicReceptionStateLabel_;
-	QLabel* topicLastReceivedAtLabel_;
-	QLabel* topicReceivedCountLabel_;
-	QLabel* topicLastMessageLabel_;
+	QTableWidget* topicStatusTable_;
 	QPlainTextEdit* eventLog_;
 	QTimer* statusTimer_;
 };

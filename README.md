@@ -47,12 +47,12 @@ ros2 run ros2_qt_gui ros2_qt_gui
 起動や設定、エラーなどの重要イベントは、時刻と重要度とともにウィンドウ内へ表示されます。
 表示は最新500件に制限され、古いイベントから自動的に削除されます。
 
-既定では`system_status`トピックの`std_msgs/msg/String`を監視します。別のターミナルから次のように
-送信すると、受信状態、最終受信時刻、受信件数、および最新メッセージが更新されます。
+既定では`camera/status`と`plc/status`の`std_msgs/msg/String`を監視します。別のターミナルから
+次のように送信すると、受信状態、最終受信時刻、受信件数、および最新メッセージが更新されます。
 
 ```bash
 source /opt/ros/humble/setup.bash
-ros2 topic pub /system_status std_msgs/msg/String "{data: ready}" --rate 1
+ros2 topic pub /camera/status std_msgs/msg/String "{data: capturing}" --rate 1
 ```
 
 受信が設定時間以上途切れると`TIMED OUT`になり、再受信すると`RECEIVING`へ復旧します。初回受信、
@@ -67,7 +67,9 @@ ros2_qt_gui_node:
   ros__parameters:
     heartbeat_interval_ms: 1000
     gui_status_check_interval_ms: 200
-    monitored_topic: system_status
+    monitored_topics:
+      - camera/status
+      - plc/status
     topic_reception_timeout_ms: 3000
 ```
 
@@ -136,4 +138,5 @@ cd ros2_test
 
 - [開発環境セットアップガイド](docs/development_setup_guide.md)
 - [アーキテクチャ・開発ガイド](docs/architecture_and_development_guidelines.md)
+- [ROSトピック受信Supervisor利用ガイド](docs/topic_reception_supervisor_guide.md)
 - [AIエージェント向け基本プロンプト](prompts/ros2_qt_gui_agent_prompt.md)

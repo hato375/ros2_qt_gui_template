@@ -2,9 +2,12 @@
 
 #include <chrono>
 #include <exception>
+#include <set>
 #include <stdexcept>
 #include <string>
 #include <utility>
+
+#include <QByteArray>
 
 #include <rcl_interfaces/msg/integer_range.hpp>
 #include <rcl_interfaces/msg/parameter_descriptor.hpp>
@@ -19,7 +22,8 @@ constexpr std::int64_t kMaximumHeartbeatIntervalMs = 60000;
 constexpr std::int64_t kDefaultGuiStatusCheckIntervalMs = 200;
 constexpr std::int64_t kMinimumGuiStatusCheckIntervalMs = 50;
 constexpr std::int64_t kMaximumGuiStatusCheckIntervalMs = 10000;
-constexpr char kDefaultMonitoredTopic[] = "system_status";
+constexpr char kDefaultCameraStatusTopic[] = "camera/status";
+constexpr char kDefaultPlcStatusTopic[] = "plc/status";
 constexpr std::int64_t kDefaultTopicReceptionTimeoutMs = 3000;
 constexpr std::int64_t kMinimumTopicReceptionTimeoutMs = 500;
 constexpr std::int64_t kMaximumTopicReceptionTimeoutMs = 600000;
@@ -84,10 +88,13 @@ RosNode::RosNode(
 			  "GUI status check interval in milliseconds.",
 			  kMinimumGuiStatusCheckIntervalMs,
 			  kMaximumGuiStatusCheckIntervalMs))),
-	  monitoredTopic_(declare_parameter<std::string>(
-		  "monitored_topic",
-		  kDefaultMonitoredTopic,
-		  makeReadOnlyDescriptor("Name of the std_msgs/String topic to monitor."))),
+	  monitoredTopics_(declare_parameter<std::vector<std::string>>(
+		  "monitored_topics",
+		  std::vector<std::string>{
+			  kDefaultCameraStatusTopic,
+			  kDefaultPlcStatusTopic,
+		  },
+		  makeReadOnlyDescriptor("Names of the std_msgs/String topics to monitor."))),
 	  topicReceptionTimeoutMs_(declare_parameter<std::int64_t>(
 		  "topic_reception_timeout_ms",
 		  kDefaultTopicReceptionTimeoutMs,
@@ -95,12 +102,10 @@ RosNode::RosNode(
 			  "Topic reception timeout in milliseconds.",
 			  kMinimumTopicReceptionTimeoutMs,
 			  kMaximumTopicReceptionTimeoutMs))),
-	  topicReceptionMonitor_(
-		  QString::fromStdString(monitoredTopic_),
-		  std::chrono::milliseconds(topicReceptionTimeoutMs_)),
+	  topicReceptionMonitors_(),
 	  heartbeatCount_(0),
 	  heartbeatTimer_(),
-	  monitoredTopicSubscription_(),
+	  monitoredTopicSubscriptions_(),
 	  topicReceptionStatusTimer_() {
 	validateInterval(
 		"heartbeat_interval_ms",
@@ -112,8 +117,17 @@ RosNode::RosNode(
 		guiStatusCheckIntervalMs_,
 		kMinimumGuiStatusCheckIntervalMs,
 		kMaximumGuiStatusCheckIntervalMs);
-	if (monitoredTopic_.empty()) {
-		throw std::invalid_argument("monitored_topic must not be empty");
+	if (monitoredTopics_.empty()) {
+		throw std::invalid_argument("monitored_topics must not be empty");
+	}
+	std::set<std::string> uniqueTopics;
+	for (const auto& topic : monitoredTopics_) {
+		if (topic.empty()) {
+			throw std::invalid_argument("monitored_topics must not contain an empty topic");
+		}
+		if (!uniqueTopics.insert(topic).second) {
+			throw std::invalid_argument("monitored_topics must not contain duplicates");
+		}
 	}
 	validateInterval(
 		"topic_reception_timeout_ms",
@@ -124,12 +138,21 @@ RosNode::RosNode(
 	heartbeatTimer_ = create_wall_timer(std::chrono::milliseconds(heartbeatIntervalMs_), [this]() {
 		onHeartbeat();
 	});
-	monitoredTopicSubscription_ = create_subscription<std_msgs::msg::String>(
-		monitoredTopic_,
-		rclcpp::QoS(10),
-		[this](const std_msgs::msg::String::SharedPtr message) {
-			onMonitoredTopic(message);
-		});
+	topicReceptionMonitors_.reserve(monitoredTopics_.size());
+	monitoredTopicSubscriptions_.reserve(monitoredTopics_.size());
+	for (std::size_t index = 0; index < monitoredTopics_.size(); ++index) {
+		const auto& topic = monitoredTopics_[index];
+		topicReceptionMonitors_.push_back(
+			std::make_unique<yds::ros2::TopicReceptionMonitor>(
+				QString::fromStdString(topic),
+				std::chrono::milliseconds(topicReceptionTimeoutMs_)));
+		monitoredTopicSubscriptions_.push_back(create_subscription<std_msgs::msg::String>(
+			topic,
+			rclcpp::QoS(10),
+			[this, index](const std_msgs::msg::String::SharedPtr message) {
+				onMonitoredTopic(index, message);
+			}));
+	}
 	topicReceptionStatusTimer_ = create_wall_timer(
 		std::chrono::milliseconds(kTopicReceptionStatusUpdateIntervalMs),
 		[this]() {
@@ -138,11 +161,14 @@ RosNode::RosNode(
 	RCLCPP_INFO(
 		get_logger(),
 		"Configuration: heartbeat_interval_ms=%ld, gui_status_check_interval_ms=%ld, "
-		"monitored_topic=%s, topic_reception_timeout_ms=%ld",
+		"monitored_topic_count=%lu, topic_reception_timeout_ms=%ld",
 		static_cast<long>(heartbeatIntervalMs_),
 		static_cast<long>(guiStatusCheckIntervalMs_),
-		monitoredTopic_.c_str(),
+		static_cast<unsigned long>(monitoredTopics_.size()),
 		static_cast<long>(topicReceptionTimeoutMs_));
+	for (const auto& topic : monitoredTopics_) {
+		RCLCPP_INFO(get_logger(), "Monitoring topic: %s", topic.c_str());
+	}
 	RCLCPP_INFO(get_logger(), "ROS 2 node started");
 }
 
@@ -154,8 +180,8 @@ std::int64_t RosNode::guiStatusCheckIntervalMs() const noexcept {
 	return guiStatusCheckIntervalMs_;
 }
 
-const std::string& RosNode::monitoredTopic() const noexcept {
-	return monitoredTopic_;
+const std::vector<std::string>& RosNode::monitoredTopics() const noexcept {
+	return monitoredTopics_;
 }
 
 std::int64_t RosNode::topicReceptionTimeoutMs() const noexcept {
@@ -181,10 +207,14 @@ void RosNode::onHeartbeat() noexcept {
 	}
 }
 
-void RosNode::onMonitoredTopic(const std_msgs::msg::String::SharedPtr message) noexcept {
+void RosNode::onMonitoredTopic(
+	std::size_t monitorIndex,
+	const std_msgs::msg::String::SharedPtr message) noexcept {
 	try {
+		auto& monitor = *topicReceptionMonitors_.at(monitorIndex);
 		handleTopicReceptionTransition(
-			topicReceptionMonitor_.recordReception(QString::fromStdString(message->data)));
+			monitor.status().topicName,
+			monitor.recordReception(QString::fromStdString(message->data)));
 	} catch (const std::exception& exception) {
 		RCLCPP_ERROR(
 			get_logger(),
@@ -203,17 +233,22 @@ void RosNode::onMonitoredTopic(const std_msgs::msg::String::SharedPtr message) n
 }
 
 void RosNode::updateTopicReceptionStatus() noexcept {
-	handleTopicReceptionTransition(topicReceptionMonitor_.checkTimeout());
-	notifyTopicReceptionStatus();
+	for (auto& monitor : topicReceptionMonitors_) {
+		handleTopicReceptionTransition(
+			monitor->status().topicName,
+			monitor->checkTimeout());
+		notifyTopicReceptionStatus(*monitor);
+	}
 }
 
-void RosNode::notifyTopicReceptionStatus() noexcept {
+void RosNode::notifyTopicReceptionStatus(
+	yds::ros2::TopicReceptionMonitor& monitor) noexcept {
 	if (!topicReceptionStatusCallback_) {
 		return;
 	}
 
 	try {
-		auto status = topicReceptionMonitor_.takeStatusUpdate();
+		auto status = monitor.takeStatusUpdate();
 		if (!status) {
 			return;
 		}
@@ -231,7 +266,9 @@ void RosNode::notifyTopicReceptionStatus() noexcept {
 }
 
 void RosNode::handleTopicReceptionTransition(
+	const QString& topicName,
 	yds::ros2::TopicReceptionTransition transition) noexcept {
+	const QByteArray topicNameUtf8 = topicName.toUtf8();
 	switch (transition) {
 	case yds::ros2::TopicReceptionTransition::kNone:
 		return;
@@ -239,31 +276,31 @@ void RosNode::handleTopicReceptionTransition(
 		RCLCPP_INFO(
 			get_logger(),
 			"Topic reception started: %s",
-			monitoredTopic_.c_str());
+			topicNameUtf8.constData());
 		reportApplicationEvent(
 			yds::ros2::ApplicationEventLevel::kInfo,
 			QStringLiteral("Topic reception started: %1")
-				.arg(QString::fromStdString(monitoredTopic_)));
+				.arg(topicName));
 		return;
 	case yds::ros2::TopicReceptionTransition::kTimedOut:
 		RCLCPP_WARN(
 			get_logger(),
 			"Topic reception timed out: %s",
-			monitoredTopic_.c_str());
+			topicNameUtf8.constData());
 		reportApplicationEvent(
 			yds::ros2::ApplicationEventLevel::kWarning,
 			QStringLiteral("Topic reception timed out: %1")
-				.arg(QString::fromStdString(monitoredTopic_)));
+				.arg(topicName));
 		return;
 	case yds::ros2::TopicReceptionTransition::kRecovered:
 		RCLCPP_INFO(
 			get_logger(),
 			"Topic reception recovered: %s",
-			monitoredTopic_.c_str());
+			topicNameUtf8.constData());
 		reportApplicationEvent(
 			yds::ros2::ApplicationEventLevel::kInfo,
 			QStringLiteral("Topic reception recovered: %1")
-				.arg(QString::fromStdString(monitoredTopic_)));
+				.arg(topicName));
 		return;
 	}
 }

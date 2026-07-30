@@ -48,7 +48,8 @@ ROS Executorスレッド
 `yds::ros2::TopicReceptionMonitor`へ最新値を渡します。共通モニターはROSメッセージ型に依存せず、
 初回受信、受信時刻、受信件数、タイムアウト、および復旧の状態を管理します。camera、PLC、
 Supervisorなどのノードでも、受信メッセージを表示用の`QString`へ変換して同じモニターを
-利用できます。
+利用できます。現在の`ros2_qt_gui`は、設定されたトピックごとにSubscriptionと共通モニターを1つずつ
+所有し、Supervisorとして複数ノードの受信状態を一元監視します。
 
 GUI通知は200ミリ秒周期のROSタイマーで集約し、高頻度入力時にQtのqueued connectionが無制限に
 増えないようにします。GUI表示は最新データ優先であり、全メッセージの記録用途には使用しません。

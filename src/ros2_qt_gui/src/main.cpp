@@ -4,6 +4,7 @@
 #include <QApplication>
 #include <QMessageBox>
 #include <QObject>
+#include <QStringList>
 
 #include <rclcpp/rclcpp.hpp>
 
@@ -51,12 +52,17 @@ int main(int argc, char* argv[]) {
 			&ros2qtgui::MainWindow::setTopicReceptionStatus,
 			Qt::QueuedConnection);
 
-		rosQtBridge.notifyTopicReceptionStatus({
-			QString::fromStdString(rosNode->monitoredTopic()),
-			yds::ros2::TopicReceptionState::kWaiting,
-			QDateTime(),
-			0,
-			QString()});
+		QStringList monitoredTopicNames;
+		for (const auto& topic : rosNode->monitoredTopics()) {
+			const QString topicName = QString::fromStdString(topic);
+			monitoredTopicNames.push_back(topicName);
+			rosQtBridge.notifyTopicReceptionStatus({
+				topicName,
+				yds::ros2::TopicReceptionState::kWaiting,
+				QDateTime(),
+				0,
+				QString()});
+		}
 
 		rosQtBridge.notifyApplicationEvent({
 			yds::ros2::ApplicationEventLevel::kInfo,
@@ -67,10 +73,10 @@ int main(int argc, char* argv[]) {
 			QDateTime::currentDateTime(),
 			QStringLiteral(
 				"Configuration: heartbeat_interval_ms=%1, gui_status_check_interval_ms=%2, "
-				"monitored_topic=%3, topic_reception_timeout_ms=%4")
+				"monitored_topics=[%3], topic_reception_timeout_ms=%4")
 				.arg(rosNode->heartbeatIntervalMs())
 				.arg(rosNode->guiStatusCheckIntervalMs())
-				.arg(QString::fromStdString(rosNode->monitoredTopic()))
+				.arg(monitoredTopicNames.join(QStringLiteral(", ")))
 				.arg(rosNode->topicReceptionTimeoutMs())});
 
 		yds::ros2::ExecutorRunner executorRunner(rosNode);

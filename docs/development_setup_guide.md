@@ -174,7 +174,7 @@ src/ros2_qt_gui/config/ros2_qt_gui.yaml
 |---|---:|---:|---|
 | `heartbeat_interval_ms` | 1000 | 100～60000 | ROSハートビート周期 |
 | `gui_status_check_interval_ms` | 200 | 50～10000 | GUIによるROS状態確認周期 |
-| `monitored_topic` | `system_status` | 空文字列不可 | 監視する`std_msgs/msg/String`トピック |
+| `monitored_topics` | `[camera/status, plc/status]` | 空・重複不可 | 監視するStringトピック一覧 |
 | `topic_reception_timeout_ms` | 3000 | 500～600000 | トピック受信タイムアウト時間 |
 
 パラメータは起動時に確定する読み取り専用設定です。別のYAMLを指定する場合は次のように起動します。

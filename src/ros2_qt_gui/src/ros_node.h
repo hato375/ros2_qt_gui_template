@@ -2,7 +2,9 @@
 
 #include <cstdint>
 #include <functional>
+#include <memory>
 #include <string>
+#include <vector>
 
 #include <rclcpp/rclcpp.hpp>
 #include <std_msgs/msg/string.hpp>
@@ -41,9 +43,9 @@ public:
 	/// @return GUI状態確認周期（ミリ秒）
 	std::int64_t guiStatusCheckIntervalMs() const noexcept;
 
-	/// @brief 監視するROSトピック名を取得する
-	/// @return 監視するROSトピック名
-	const std::string& monitoredTopic() const noexcept;
+	/// @brief 監視するROSトピック名の一覧を取得する
+	/// @return 監視するROSトピック名の一覧
+	const std::vector<std::string>& monitoredTopics() const noexcept;
 
 	/// @brief トピック受信タイムアウト時間を取得する
 	/// @return トピック受信タイムアウト時間（ミリ秒）
@@ -51,10 +53,14 @@ public:
 
 private:
 	void onHeartbeat() noexcept;
-	void onMonitoredTopic(const std_msgs::msg::String::SharedPtr message) noexcept;
+	void onMonitoredTopic(
+		std::size_t monitorIndex,
+		const std_msgs::msg::String::SharedPtr message) noexcept;
 	void updateTopicReceptionStatus() noexcept;
-	void notifyTopicReceptionStatus() noexcept;
+	void notifyTopicReceptionStatus(
+		yds::ros2::TopicReceptionMonitor& monitor) noexcept;
 	void handleTopicReceptionTransition(
+		const QString& topicName,
 		yds::ros2::TopicReceptionTransition transition) noexcept;
 	void reportApplicationEvent(
 		yds::ros2::ApplicationEventLevel level,
@@ -65,12 +71,14 @@ private:
 	TopicReceptionStatusCallback topicReceptionStatusCallback_;
 	std::int64_t heartbeatIntervalMs_;
 	std::int64_t guiStatusCheckIntervalMs_;
-	std::string monitoredTopic_;
+	std::vector<std::string> monitoredTopics_;
 	std::int64_t topicReceptionTimeoutMs_;
-	yds::ros2::TopicReceptionMonitor topicReceptionMonitor_;
+	std::vector<std::unique_ptr<yds::ros2::TopicReceptionMonitor>>
+		topicReceptionMonitors_;
 	std::uint64_t heartbeatCount_;
 	rclcpp::TimerBase::SharedPtr heartbeatTimer_;
-	rclcpp::Subscription<std_msgs::msg::String>::SharedPtr monitoredTopicSubscription_;
+	std::vector<rclcpp::Subscription<std_msgs::msg::String>::SharedPtr>
+		monitoredTopicSubscriptions_;
 	rclcpp::TimerBase::SharedPtr topicReceptionStatusTimer_;
 };
 
