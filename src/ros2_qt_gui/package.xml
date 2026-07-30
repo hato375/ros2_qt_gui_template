@@ -12,6 +12,7 @@
 
 	<depend>rcl_interfaces</depend>
 	<depend>rclcpp</depend>
+	<depend>std_msgs</depend>
 	<depend>yds_ros2</depend>
 
 	<exec_depend>launch</exec_depend>

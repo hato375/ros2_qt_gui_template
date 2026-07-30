@@ -9,6 +9,7 @@
 
 #include "yds/ros2/application_event.h"
 #include "yds/ros2/executor_runner.h"
+#include "yds/ros2/topic_reception_status.h"
 
 namespace {
 
@@ -51,6 +52,21 @@ TEST(ApplicationEventTest, ConvertsEventLevelsToText) {
 		QStringLiteral("CRITICAL"));
 	EXPECT_EQ(
 		yds::ros2::eventLevelText(static_cast<yds::ros2::ApplicationEventLevel>(-1)),
+		QStringLiteral("UNKNOWN"));
+}
+
+TEST(TopicReceptionStatusTest, ConvertsStatesToText) {
+	EXPECT_EQ(
+		yds::ros2::topicReceptionStateText(yds::ros2::TopicReceptionState::kWaiting),
+		QStringLiteral("WAITING"));
+	EXPECT_EQ(
+		yds::ros2::topicReceptionStateText(yds::ros2::TopicReceptionState::kReceiving),
+		QStringLiteral("RECEIVING"));
+	EXPECT_EQ(
+		yds::ros2::topicReceptionStateText(yds::ros2::TopicReceptionState::kTimedOut),
+		QStringLiteral("TIMED OUT"));
+	EXPECT_EQ(
+		yds::ros2::topicReceptionStateText(static_cast<yds::ros2::TopicReceptionState>(-1)),
 		QStringLiteral("UNKNOWN"));
 }
 

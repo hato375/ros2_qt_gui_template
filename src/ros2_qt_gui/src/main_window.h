@@ -3,6 +3,7 @@
 #include <QMainWindow>
 
 #include <yds/ros2/application_event.h>
+#include <yds/ros2/topic_reception_status.h>
 
 class QLabel;
 class QPlainTextEdit;
@@ -25,11 +26,21 @@ public:
 	/// @param event 表示するイベント
 	void appendApplicationEvent(const yds::ros2::ApplicationEvent& event) noexcept;
 
+	/// @brief ROSトピックの受信状況を更新する
+	/// @param status 表示する受信状況
+	void setTopicReceptionStatus(
+		const yds::ros2::TopicReceptionStatus& status) noexcept;
+
 private:
 	void updateRosStatus() noexcept;
 
 	QLabel* statusLabel_;
 	QLabel* heartbeatLabel_;
+	QLabel* monitoredTopicLabel_;
+	QLabel* topicReceptionStateLabel_;
+	QLabel* topicLastReceivedAtLabel_;
+	QLabel* topicReceivedCountLabel_;
+	QLabel* topicLastMessageLabel_;
 	QPlainTextEdit* eventLog_;
 	QTimer* statusTimer_;
 };

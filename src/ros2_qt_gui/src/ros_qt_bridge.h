@@ -5,6 +5,7 @@
 #include <QObject>
 
 #include <yds/ros2/application_event.h>
+#include <yds/ros2/topic_reception_status.h>
 
 namespace ros2qtgui {
 
@@ -25,6 +26,11 @@ public:
 	/// @param event 通知するイベント
 	void notifyApplicationEvent(const yds::ros2::ApplicationEvent& event) noexcept;
 
+	/// @brief ROSトピックの受信状況を通知する
+	/// @param status 通知する受信状況
+	void notifyTopicReceptionStatus(
+		const yds::ros2::TopicReceptionStatus& status) noexcept;
+
 signals:
 	/// @brief ハートビートが更新されたときに送出される
 	/// @param count ハートビート回数
@@ -33,6 +39,10 @@ signals:
 	/// @brief アプリケーションイベントが発生したときに送出される
 	/// @param event 発生したイベント
 	void applicationEventOccurred(const yds::ros2::ApplicationEvent& event);
+
+	/// @brief ROSトピックの受信状況が更新されたときに送出される
+	/// @param status 更新された受信状況
+	void topicReceptionStatusUpdated(const yds::ros2::TopicReceptionStatus& status);
 };
 
 }  // namespace ros2qtgui
