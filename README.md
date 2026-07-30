@@ -23,8 +23,9 @@ colcon build --packages-up-to ros2_qt_gui
 source install/setup.bash
 ```
 
-ワークスペースには、GUIアプリケーションの`ros2_qt_gui`と、共通ROS 2ライブラリの`yds_ros2`が
-含まれます。`yds_ros2`の公開APIは`yds::ros2`名前空間と`yds/ros2`インクルードパスを使用します。
+ワークスペースには、GUIアプリケーションの`ros2_qt_gui`、共通ROS 2ライブラリの`yds_ros2`、
+および共通メッセージ定義の`yds_interfaces`が含まれます。`yds_ros2`の公開APIは
+`yds::ros2`名前空間と`yds/ros2`インクルードパスを使用します。
 共通ライブラリでもQt Core型を基本とし、ROS APIが標準C++型を要求する境界で必要な変換を行います。
 `yds::ros2::TopicReceptionMonitor`はROSメッセージ型に依存せず、camera、PLC、Supervisorなどの
 ノードから共通利用できます。
@@ -47,12 +48,15 @@ ros2 run ros2_qt_gui ros2_qt_gui
 起動や設定、エラーなどの重要イベントは、時刻と重要度とともにウィンドウ内へ表示されます。
 表示は最新500件に制限され、古いイベントから自動的に削除されます。
 
-既定では`camera/status`と`plc/status`の`std_msgs/msg/String`を監視します。別のターミナルから
-次のように送信すると、受信状態、最終受信時刻、受信件数、および最新メッセージが更新されます。
+既定では`camera/status`と`plc/status`の`yds_interfaces/msg/EquipmentStatus`を監視します。
+別のターミナルから次のように送信すると、通信状態、設備状態、エラーコード、最終受信時刻、
+受信件数、およびメッセージが更新されます。
 
 ```bash
 source /opt/ros/humble/setup.bash
-ros2 topic pub /camera/status std_msgs/msg/String "{data: capturing}" --rate 1
+source install/setup.bash
+ros2 topic pub /camera/status yds_interfaces/msg/EquipmentStatus \
+  "{equipment_id: camera-1, state: 3, error_code: 0, message: capturing}" --rate 1
 ```
 
 受信が設定時間以上途切れると`TIMED OUT`になり、再受信すると`RECEIVING`へ復旧します。初回受信、
@@ -84,7 +88,7 @@ ros2 launch ros2_qt_gui ros2_qt_gui.launch.py \
 
 ```bash
 source /opt/ros/humble/setup.bash
-colcon test --packages-select yds_ros2 ros2_qt_gui
+colcon test --packages-select yds_interfaces yds_ros2 ros2_qt_gui
 colcon test-result --verbose
 ```
 

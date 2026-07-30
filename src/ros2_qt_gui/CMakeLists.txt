@@ -11,7 +11,7 @@ set(CMAKE_AUTOMOC ON)
 find_package(ament_cmake REQUIRED)
 find_package(rcl_interfaces REQUIRED)
 find_package(rclcpp REQUIRED)
-find_package(std_msgs REQUIRED)
+find_package(yds_interfaces REQUIRED)
 find_package(Qt5 REQUIRED COMPONENTS Widgets)
 find_package(yds_ros2 REQUIRED)
 
@@ -24,7 +24,7 @@ add_executable(${PROJECT_NAME}
 )
 
 target_link_libraries(${PROJECT_NAME} Qt5::Widgets yds_ros2::yds_ros2)
-ament_target_dependencies(${PROJECT_NAME} rcl_interfaces rclcpp std_msgs)
+ament_target_dependencies(${PROJECT_NAME} rcl_interfaces rclcpp yds_interfaces)
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
 	target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra -Wpedantic)
@@ -45,7 +45,7 @@ if(BUILD_TESTING)
 	)
 	target_include_directories(ros2_qt_gui_test PRIVATE src)
 	target_link_libraries(ros2_qt_gui_test Qt5::Widgets yds_ros2::yds_ros2)
-	ament_target_dependencies(ros2_qt_gui_test rcl_interfaces rclcpp std_msgs)
+	ament_target_dependencies(ros2_qt_gui_test rcl_interfaces rclcpp yds_interfaces)
 
 	if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
 		target_compile_options(ros2_qt_gui_test PRIVATE -Wall -Wextra -Wpedantic)

@@ -8,6 +8,7 @@
 #include <utility>
 
 #include <QByteArray>
+#include <QDateTime>
 
 #include <rcl_interfaces/msg/integer_range.hpp>
 #include <rcl_interfaces/msg/parameter_descriptor.hpp>
@@ -63,17 +64,51 @@ void validateInterval(
 	}
 }
 
+yds::ros2::EquipmentState equipmentStateFromRos(std::uint8_t state) noexcept {
+	switch (state) {
+	case yds_interfaces::msg::EquipmentStatus::STATE_INITIALIZING:
+		return yds::ros2::EquipmentState::kInitializing;
+	case yds_interfaces::msg::EquipmentStatus::STATE_READY:
+		return yds::ros2::EquipmentState::kReady;
+	case yds_interfaces::msg::EquipmentStatus::STATE_RUNNING:
+		return yds::ros2::EquipmentState::kRunning;
+	case yds_interfaces::msg::EquipmentStatus::STATE_WARNING:
+		return yds::ros2::EquipmentState::kWarning;
+	case yds_interfaces::msg::EquipmentStatus::STATE_ERROR:
+		return yds::ros2::EquipmentState::kError;
+	case yds_interfaces::msg::EquipmentStatus::STATE_CRITICAL:
+		return yds::ros2::EquipmentState::kCritical;
+	case yds_interfaces::msg::EquipmentStatus::STATE_STOPPED:
+		return yds::ros2::EquipmentState::kStopped;
+	case yds_interfaces::msg::EquipmentStatus::STATE_UNKNOWN:
+	default:
+		return yds::ros2::EquipmentState::kUnknown;
+	}
+}
+
+QDateTime timestampFromRos(const builtin_interfaces::msg::Time& timestamp) noexcept {
+	if (timestamp.sec == 0 && timestamp.nanosec == 0) {
+		return QDateTime::currentDateTime();
+	}
+	const qint64 milliseconds =
+		static_cast<qint64>(timestamp.sec) * 1000 +
+		static_cast<qint64>(timestamp.nanosec) / 1000000;
+	return QDateTime::fromMSecsSinceEpoch(milliseconds, Qt::UTC).toLocalTime();
+}
+
 }  // namespace
 
 RosNode::RosNode(
 	HeartbeatCallback heartbeatCallback,
 	ApplicationEventCallback applicationEventCallback,
 	TopicReceptionStatusCallback topicReceptionStatusCallback,
+	EquipmentStatusCallback equipmentStatusCallback,
 	const rclcpp::NodeOptions& options)
 	: Node("ros2_qt_gui_node", options),
 	  heartbeatCallback_(std::move(heartbeatCallback)),
 	  applicationEventCallback_(std::move(applicationEventCallback)),
 	  topicReceptionStatusCallback_(std::move(topicReceptionStatusCallback)),
+	  equipmentStatusCallback_(std::move(equipmentStatusCallback)),
 	  heartbeatIntervalMs_(declare_parameter<std::int64_t>(
 		  "heartbeat_interval_ms",
 		  kDefaultHeartbeatIntervalMs,
@@ -94,7 +129,7 @@ RosNode::RosNode(
 			  kDefaultCameraStatusTopic,
 			  kDefaultPlcStatusTopic,
 		  },
-		  makeReadOnlyDescriptor("Names of the std_msgs/String topics to monitor."))),
+		  makeReadOnlyDescriptor("Names of the yds_interfaces/EquipmentStatus topics to monitor."))),
 	  topicReceptionTimeoutMs_(declare_parameter<std::int64_t>(
 		  "topic_reception_timeout_ms",
 		  kDefaultTopicReceptionTimeoutMs,
@@ -103,6 +138,9 @@ RosNode::RosNode(
 			  kMinimumTopicReceptionTimeoutMs,
 			  kMaximumTopicReceptionTimeoutMs))),
 	  topicReceptionMonitors_(),
+	  latestEquipmentStatuses_(),
+	  hasEquipmentStatuses_(),
+	  equipmentStatusDirty_(),
 	  heartbeatCount_(0),
 	  heartbeatTimer_(),
 	  monitoredTopicSubscriptions_(),
@@ -139,6 +177,9 @@ RosNode::RosNode(
 		onHeartbeat();
 	});
 	topicReceptionMonitors_.reserve(monitoredTopics_.size());
+	latestEquipmentStatuses_.reserve(monitoredTopics_.size());
+	hasEquipmentStatuses_.reserve(monitoredTopics_.size());
+	equipmentStatusDirty_.reserve(monitoredTopics_.size());
 	monitoredTopicSubscriptions_.reserve(monitoredTopics_.size());
 	for (std::size_t index = 0; index < monitoredTopics_.size(); ++index) {
 		const auto& topic = monitoredTopics_[index];
@@ -146,10 +187,20 @@ RosNode::RosNode(
 			std::make_unique<yds::ros2::TopicReceptionMonitor>(
 				QString::fromStdString(topic),
 				std::chrono::milliseconds(topicReceptionTimeoutMs_)));
-		monitoredTopicSubscriptions_.push_back(create_subscription<std_msgs::msg::String>(
+		latestEquipmentStatuses_.push_back({
+			QString::fromStdString(topic),
+			QString(),
+			yds::ros2::EquipmentState::kUnknown,
+			0,
+			QString(),
+			QDateTime()});
+		hasEquipmentStatuses_.push_back(false);
+		equipmentStatusDirty_.push_back(false);
+		monitoredTopicSubscriptions_.push_back(
+			create_subscription<yds_interfaces::msg::EquipmentStatus>(
 			topic,
 			rclcpp::QoS(10),
-			[this, index](const std_msgs::msg::String::SharedPtr message) {
+			[this, index](const yds_interfaces::msg::EquipmentStatus::SharedPtr message) {
 				onMonitoredTopic(index, message);
 			}));
 	}
@@ -209,12 +260,25 @@ void RosNode::onHeartbeat() noexcept {
 
 void RosNode::onMonitoredTopic(
 	std::size_t monitorIndex,
-	const std_msgs::msg::String::SharedPtr message) noexcept {
+	const yds_interfaces::msg::EquipmentStatus::SharedPtr message) noexcept {
 	try {
 		auto& monitor = *topicReceptionMonitors_.at(monitorIndex);
+		const auto previousStatus = latestEquipmentStatuses_.at(monitorIndex);
+		const bool hasPreviousStatus = hasEquipmentStatuses_.at(monitorIndex);
+		yds::ros2::EquipmentStatus status{
+			monitor.status().topicName,
+			QString::fromStdString(message->equipment_id),
+			equipmentStateFromRos(message->state),
+			static_cast<qint32>(message->error_code),
+			QString::fromStdString(message->message),
+			timestampFromRos(message->header.stamp)};
+		latestEquipmentStatuses_.at(monitorIndex) = status;
+		hasEquipmentStatuses_.at(monitorIndex) = true;
+		equipmentStatusDirty_.at(monitorIndex) = true;
 		handleTopicReceptionTransition(
 			monitor.status().topicName,
-			monitor.recordReception(QString::fromStdString(message->data)));
+			monitor.recordReception(status.message));
+		handleEquipmentStateTransition(previousStatus, status, hasPreviousStatus);
 	} catch (const std::exception& exception) {
 		RCLCPP_ERROR(
 			get_logger(),
@@ -233,11 +297,13 @@ void RosNode::onMonitoredTopic(
 }
 
 void RosNode::updateTopicReceptionStatus() noexcept {
-	for (auto& monitor : topicReceptionMonitors_) {
+	for (std::size_t index = 0; index < topicReceptionMonitors_.size(); ++index) {
+		auto& monitor = topicReceptionMonitors_[index];
 		handleTopicReceptionTransition(
 			monitor->status().topicName,
 			monitor->checkTimeout());
 		notifyTopicReceptionStatus(*monitor);
+		notifyEquipmentStatus(index);
 	}
 }
 
@@ -262,6 +328,82 @@ void RosNode::notifyTopicReceptionStatus(
 		RCLCPP_ERROR(
 			get_logger(),
 			"Topic reception status callback failed with an unknown error");
+	}
+}
+
+void RosNode::handleEquipmentStateTransition(
+	const yds::ros2::EquipmentStatus& previousStatus,
+	const yds::ros2::EquipmentStatus& currentStatus,
+	bool hasPreviousStatus) noexcept {
+	if (hasPreviousStatus &&
+		previousStatus.state == currentStatus.state &&
+		previousStatus.errorCode == currentStatus.errorCode) {
+		return;
+	}
+
+	yds::ros2::ApplicationEventLevel level = yds::ros2::ApplicationEventLevel::kInfo;
+	switch (currentStatus.state) {
+	case yds::ros2::EquipmentState::kWarning:
+		level = yds::ros2::ApplicationEventLevel::kWarning;
+		break;
+	case yds::ros2::EquipmentState::kError:
+		level = yds::ros2::ApplicationEventLevel::kError;
+		break;
+	case yds::ros2::EquipmentState::kCritical:
+		level = yds::ros2::ApplicationEventLevel::kCritical;
+		break;
+	case yds::ros2::EquipmentState::kUnknown:
+	case yds::ros2::EquipmentState::kInitializing:
+	case yds::ros2::EquipmentState::kReady:
+	case yds::ros2::EquipmentState::kRunning:
+	case yds::ros2::EquipmentState::kStopped:
+		break;
+	}
+
+	const QString eventMessage =
+		QStringLiteral("Equipment state changed: topic=%1, equipment_id=%2, state=%3, "
+			"error_code=%4, message=%5")
+			.arg(
+				currentStatus.topicName,
+				currentStatus.equipmentId,
+				yds::ros2::equipmentStateText(currentStatus.state))
+			.arg(currentStatus.errorCode)
+			.arg(currentStatus.message);
+	const QByteArray eventMessageUtf8 = eventMessage.toUtf8();
+	switch (level) {
+	case yds::ros2::ApplicationEventLevel::kInfo:
+		RCLCPP_INFO(get_logger(), "%s", eventMessageUtf8.constData());
+		break;
+	case yds::ros2::ApplicationEventLevel::kWarning:
+		RCLCPP_WARN(get_logger(), "%s", eventMessageUtf8.constData());
+		break;
+	case yds::ros2::ApplicationEventLevel::kError:
+		RCLCPP_ERROR(get_logger(), "%s", eventMessageUtf8.constData());
+		break;
+	case yds::ros2::ApplicationEventLevel::kCritical:
+		RCLCPP_FATAL(get_logger(), "%s", eventMessageUtf8.constData());
+		break;
+	}
+	reportApplicationEvent(level, eventMessage);
+}
+
+void RosNode::notifyEquipmentStatus(std::size_t monitorIndex) noexcept {
+	if (!equipmentStatusCallback_ || !equipmentStatusDirty_.at(monitorIndex)) {
+		return;
+	}
+
+	try {
+		equipmentStatusCallback_(latestEquipmentStatuses_.at(monitorIndex));
+		equipmentStatusDirty_.at(monitorIndex) = false;
+	} catch (const std::exception& exception) {
+		RCLCPP_ERROR(
+			get_logger(),
+			"Equipment status callback failed: %s",
+			exception.what());
+	} catch (...) {
+		RCLCPP_ERROR(
+			get_logger(),
+			"Equipment status callback failed with an unknown error");
 	}
 }
 

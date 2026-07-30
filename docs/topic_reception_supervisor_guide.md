@@ -2,17 +2,18 @@
 
 ## 1. 目的
 
-`ros2_qt_gui`はSupervisorとして複数の`std_msgs/msg/String`トピックを購読し、各ノードから状態が
-定期的に届いているかを一元監視します。
+`ros2_qt_gui`はSupervisorとして複数の`yds_interfaces/msg/EquipmentStatus`トピックを購読し、
+各ノードから状態が定期的に届いているかを一元監視します。
 
 監視する情報は次の2種類に分かれます。
 
 - 通信状態: `WAITING`、`RECEIVING`、`TIMED OUT`
-- 設備状態: `ready`、`running`、`error`など、受信したメッセージの内容
+- 設備状態: `UNKNOWN`、`INITIALIZING`、`READY`、`RUNNING`、`WARNING`、`ERROR`、
+  `CRITICAL`、`STOPPED`
 
 `RECEIVING`はメッセージが定期的に届いていることを表し、設備が正常であることまでは
-保証しません。設備状態の判定は、メッセージ内容または将来追加する型付きステータスメッセージで
-行います。
+保証しません。例えば、設備が`ERROR`を通知し続けている間もメッセージが定期的に届いていれば、
+通信状態は`RECEIVING`です。
 
 ## 2. 監視対象の設定
 
@@ -46,22 +47,28 @@ ros2 launch ros2_qt_gui ros2_qt_gui.launch.py
 
 ```bash
 source /opt/ros/humble/setup.bash
-ros2 topic pub /camera/status std_msgs/msg/String "{data: capturing}" --rate 1
+source install/setup.bash
+ros2 topic pub /camera/status yds_interfaces/msg/EquipmentStatus \
+  "{equipment_id: camera-1, state: 3, error_code: 0, message: capturing}" --rate 1
 ```
 
 さらに別のターミナルからPLC状態を送信します。
 
 ```bash
 source /opt/ros/humble/setup.bash
-ros2 topic pub /plc/status std_msgs/msg/String "{data: connected}" --rate 1
+source install/setup.bash
+ros2 topic pub /plc/status yds_interfaces/msg/EquipmentStatus \
+  "{equipment_id: plc-1, state: 2, error_code: 0, message: connected}" --rate 1
 ```
 
 GUIにはトピックごとに次の情報が表示されます。
 
-- 受信状態
+- トピック名と設備ID
+- 通信状態
+- 設備状態とエラーコード
 - 最終受信時刻
 - 受信件数
-- 最新メッセージ
+- メッセージ
 
 送信コマンドを`Ctrl+C`で停止すると、そのトピックだけが3秒後に`TIMED OUT`になります。
 他のトピックの受信状態には影響しません。同じコマンドを再実行すると
@@ -72,16 +79,35 @@ GUIにはトピックごとに次の情報が表示されます。
 各ノードは、設定したタイムアウト時間より短い周期で状態をPublishします。
 3秒タイムアウトの場合は、1秒周期など十分な余裕を持つ周期を使用します。
 
-メッセージ例:
+`EquipmentStatus`のフィールドは次のとおりです。
 
-```text
-camera/status: ready、capturing、error
-plc/status: connected、running、error
-```
+| フィールド | 用途 |
+|---|---|
+| `header.stamp` | 状態を生成した時刻。ゼロの場合はSupervisorでの受信時刻を使用 |
+| `equipment_id` | 設備を識別する名前 |
+| `state` | 下表の設備状態 |
+| `error_code` | 正常時は0、異常時は設備ごとに定義したコード |
+| `message` | 運用者向けの補足 |
 
-現在のSupervisorは文字列を表示するだけで、`error`を受信しても自動的な停止判断は
-行いません。安全停止や設備異常の判定では、自由形式文字列ではなく、
-状態値とエラーコードを持つ型付きメッセージを使用してください。
+| 値 | 定数 | 意味 |
+|---:|---|---|
+| 0 | `STATE_UNKNOWN` | 状態不明 |
+| 1 | `STATE_INITIALIZING` | 初期化中 |
+| 2 | `STATE_READY` | 運転準備完了 |
+| 3 | `STATE_RUNNING` | 運転中 |
+| 4 | `STATE_WARNING` | 継続可能な注意状態 |
+| 5 | `STATE_ERROR` | 処理失敗または復旧可能な異常 |
+| 6 | `STATE_CRITICAL` | 安全な継続が困難な重大異常 |
+| 7 | `STATE_STOPPED` | 停止中 |
+
+設備状態またはエラーコードが変化すると、GUIイベントにも記録されます。`CRITICAL`の通知だけで
+Supervisorが自動停止することはありません。安全停止条件と停止対象は、設備仕様に基づいて
+呼び出し側で明示的に実装します。
+
+ROS標準の`diagnostic_msgs`はコンポーネントの健全性や診断値の通知に適しています。一方、この
+メッセージは`INITIALIZING`、`READY`、`RUNNING`、`STOPPED`という設備の運転ライフサイクルを
+型として共有する目的のため、プロジェクト固有の`EquipmentStatus`を使用します。必要になった場合は、
+同じノードから標準diagnosticsも併せてPublishできます。
 
 ## 5. `TopicReceptionMonitor`の共通利用
 
@@ -107,8 +133,9 @@ const auto status = monitor.takeStatusUpdate();
 ```
 
 モニターはROSメッセージ型、ROSログ、および安全停止処理に依存しません。
-各ノードはROS API境界で受信メッセージを`QString`へ変換し、
-返された状態遷移に応じてログ、通知、または停止判断を行います。
+各ノードはROS API境界で受信メッセージを`yds::ros2::EquipmentStatus`や`QString`へ変換し、
+返された状態遷移に応じてログ、通知、または停止判断を行います。ROSメッセージ型はノード間通信、
+Qt型はアプリケーション内という境界を保ちます。
 
 ## 6. 状態遷移
 

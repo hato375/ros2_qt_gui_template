@@ -29,6 +29,9 @@ int main(int argc, char* argv[]) {
 			},
 			[&rosQtBridge](const yds::ros2::TopicReceptionStatus& status) {
 				rosQtBridge.notifyTopicReceptionStatus(status);
+			},
+			[&rosQtBridge](const yds::ros2::EquipmentStatus& status) {
+				rosQtBridge.notifyEquipmentStatus(status);
 			});
 
 		ros2qtgui::MainWindow mainWindow(
@@ -50,6 +53,12 @@ int main(int argc, char* argv[]) {
 			&ros2qtgui::RosQtBridge::topicReceptionStatusUpdated,
 			&mainWindow,
 			&ros2qtgui::MainWindow::setTopicReceptionStatus,
+			Qt::QueuedConnection);
+		QObject::connect(
+			&rosQtBridge,
+			&ros2qtgui::RosQtBridge::equipmentStatusUpdated,
+			&mainWindow,
+			&ros2qtgui::MainWindow::setEquipmentStatus,
 			Qt::QueuedConnection);
 
 		QStringList monitoredTopicNames;

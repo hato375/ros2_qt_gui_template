@@ -44,12 +44,16 @@ ROS Executorスレッド
 現在のサンプルは、GUIスレッドとROS Executorスレッド、および重要イベントをGUIへ通知する経路を
 実装しています。ワーカースレッドは、実際の処理内容とデータ型が決まった段階で追加します。
 
-サンプルの`std_msgs/msg/String`トピック監視は、Subscriberコールバックから
-`yds::ros2::TopicReceptionMonitor`へ最新値を渡します。共通モニターはROSメッセージ型に依存せず、
+サンプルの`yds_interfaces/msg/EquipmentStatus`トピック監視は、Subscriberコールバックから
+`yds::ros2::TopicReceptionMonitor`へ受信情報を渡します。共通モニターはROSメッセージ型に依存せず、
 初回受信、受信時刻、受信件数、タイムアウト、および復旧の状態を管理します。camera、PLC、
 Supervisorなどのノードでも、受信メッセージを表示用の`QString`へ変換して同じモニターを
 利用できます。現在の`ros2_qt_gui`は、設定されたトピックごとにSubscriptionと共通モニターを1つずつ
 所有し、Supervisorとして複数ノードの受信状態を一元監視します。
+
+設備の意味的な状態は、ROS API境界で`yds_interfaces::msg::EquipmentStatus`からQt Core型を使う
+`yds::ros2::EquipmentStatus`へ変換します。通信状態と設備状態は別の型と通知経路で扱います。
+これにより、`RECEIVING`かつ`ERROR`のような状態を失わずに表現できます。
 
 GUI通知は200ミリ秒周期のROSタイマーで集約し、高頻度入力時にQtのqueued connectionが無制限に
 増えないようにします。GUI表示は最新データ優先であり、全メッセージの記録用途には使用しません。

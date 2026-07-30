@@ -18,10 +18,13 @@ namespace {
 
 constexpr int kMaximumEventLogEntries = 500;
 constexpr int kTopicColumn = 0;
-constexpr int kStateColumn = 1;
-constexpr int kLastReceivedAtColumn = 2;
-constexpr int kReceivedCountColumn = 3;
-constexpr int kLastMessageColumn = 4;
+constexpr int kEquipmentIdColumn = 1;
+constexpr int kReceptionStateColumn = 2;
+constexpr int kEquipmentStateColumn = 3;
+constexpr int kErrorCodeColumn = 4;
+constexpr int kLastReceivedAtColumn = 5;
+constexpr int kReceivedCountColumn = 6;
+constexpr int kMessageColumn = 7;
 
 }  // namespace
 
@@ -32,7 +35,7 @@ MainWindow::MainWindow(int statusCheckIntervalMs)
 	  eventLog_(new QPlainTextEdit(this)),
 	  statusTimer_(new QTimer(this)) {
 	setWindowTitle(tr("ROS 2 + Qt GUI"));
-	resize(640, 480);
+	resize(960, 540);
 
 	auto* centralWidget = new QWidget(this);
 	auto* layout = new QVBoxLayout(centralWidget);
@@ -41,13 +44,16 @@ MainWindow::MainWindow(int statusCheckIntervalMs)
 	layout->addWidget(heartbeatLabel_);
 	layout->addWidget(new QLabel(tr("Monitored topics"), centralWidget));
 	topicStatusTable_->setObjectName(QStringLiteral("topicStatusTable"));
-	topicStatusTable_->setColumnCount(5);
+	topicStatusTable_->setColumnCount(8);
 	topicStatusTable_->setHorizontalHeaderLabels({
 		tr("Topic"),
-		tr("State"),
+		tr("Equipment ID"),
+		tr("Communication"),
+		tr("Equipment state"),
+		tr("Error code"),
 		tr("Last received at"),
 		tr("Count"),
-		tr("Last message"),
+		tr("Message"),
 	});
 	topicStatusTable_->setEditTriggers(QAbstractItemView::NoEditTriggers);
 	topicStatusTable_->setSelectionBehavior(QAbstractItemView::SelectRows);
@@ -80,32 +86,46 @@ void MainWindow::appendApplicationEvent(const yds::ros2::ApplicationEvent& event
 
 void MainWindow::setTopicReceptionStatus(
 	const yds::ros2::TopicReceptionStatus& status) noexcept {
-	int targetRow = -1;
-	for (int row = 0; row < topicStatusTable_->rowCount(); ++row) {
-		const auto* topicItem = topicStatusTable_->item(row, kTopicColumn);
-		if (topicItem && topicItem->text() == status.topicName) {
-			targetRow = row;
-			break;
-		}
-	}
-	if (targetRow < 0) {
-		targetRow = topicStatusTable_->rowCount();
-		topicStatusTable_->insertRow(targetRow);
-		for (int column = 0; column < topicStatusTable_->columnCount(); ++column) {
-			topicStatusTable_->setItem(targetRow, column, new QTableWidgetItem());
-		}
-	}
-
+	const int targetRow = findOrCreateTopicRow(status.topicName);
 	const QString lastReceivedAt = status.lastReceivedAt.isValid()
 		? status.lastReceivedAt.toString(QStringLiteral("yyyy-MM-dd HH:mm:ss.zzz"))
 		: tr("not received");
-	topicStatusTable_->item(targetRow, kTopicColumn)->setText(status.topicName);
-	topicStatusTable_->item(targetRow, kStateColumn)->setText(
+	topicStatusTable_->item(targetRow, kReceptionStateColumn)->setText(
 		yds::ros2::topicReceptionStateText(status.state));
 	topicStatusTable_->item(targetRow, kLastReceivedAtColumn)->setText(lastReceivedAt);
 	topicStatusTable_->item(targetRow, kReceivedCountColumn)->setText(
 		QString::number(status.receivedCount));
-	topicStatusTable_->item(targetRow, kLastMessageColumn)->setText(status.lastMessage);
+}
+
+void MainWindow::setEquipmentStatus(
+	const yds::ros2::EquipmentStatus& status) noexcept {
+	const int targetRow = findOrCreateTopicRow(status.topicName);
+	topicStatusTable_->item(targetRow, kEquipmentIdColumn)->setText(status.equipmentId);
+	topicStatusTable_->item(targetRow, kEquipmentStateColumn)->setText(
+		yds::ros2::equipmentStateText(status.state));
+	topicStatusTable_->item(targetRow, kErrorCodeColumn)->setText(
+		QString::number(status.errorCode));
+	topicStatusTable_->item(targetRow, kMessageColumn)->setText(status.message);
+}
+
+int MainWindow::findOrCreateTopicRow(const QString& topicName) noexcept {
+	for (int row = 0; row < topicStatusTable_->rowCount(); ++row) {
+		const auto* topicItem = topicStatusTable_->item(row, kTopicColumn);
+		if (topicItem && topicItem->text() == topicName) {
+			return row;
+		}
+	}
+
+	const int targetRow = topicStatusTable_->rowCount();
+	topicStatusTable_->insertRow(targetRow);
+	for (int column = 0; column < topicStatusTable_->columnCount(); ++column) {
+		topicStatusTable_->setItem(targetRow, column, new QTableWidgetItem());
+	}
+	topicStatusTable_->item(targetRow, kTopicColumn)->setText(topicName);
+	topicStatusTable_->item(targetRow, kEquipmentStateColumn)->setText(
+		yds::ros2::equipmentStateText(yds::ros2::EquipmentState::kUnknown));
+	topicStatusTable_->item(targetRow, kErrorCodeColumn)->setText(QStringLiteral("0"));
+	return targetRow;
 }
 
 void MainWindow::updateRosStatus() noexcept {

@@ -7,9 +7,10 @@
 #include <vector>
 
 #include <rclcpp/rclcpp.hpp>
-#include <std_msgs/msg/string.hpp>
+#include <yds_interfaces/msg/equipment_status.hpp>
 
 #include <yds/ros2/application_event.h>
+#include <yds/ros2/equipment_status.h>
 #include <yds/ros2/topic_reception_monitor.h>
 #include <yds/ros2/topic_reception_status.h>
 
@@ -22,17 +23,21 @@ public:
 	using ApplicationEventCallback = std::function<void(const yds::ros2::ApplicationEvent&)>;
 	using TopicReceptionStatusCallback =
 		std::function<void(const yds::ros2::TopicReceptionStatus&)>;
+	using EquipmentStatusCallback =
+		std::function<void(const yds::ros2::EquipmentStatus&)>;
 
 	/// @brief ROS 2ノードを生成する
 	/// @param heartbeatCallback ハートビート更新時に呼び出す関数
 	/// @param applicationEventCallback アプリケーションイベント発生時に呼び出す関数
 	/// @param topicReceptionStatusCallback トピック受信状況の更新時に呼び出す関数
+	/// @param equipmentStatusCallback 設備状態の更新時に呼び出す関数
 	/// @param options ROS 2ノードの生成オプション
 	explicit RosNode(
 		HeartbeatCallback heartbeatCallback,
 		ApplicationEventCallback applicationEventCallback = ApplicationEventCallback(),
 		TopicReceptionStatusCallback topicReceptionStatusCallback =
 			TopicReceptionStatusCallback(),
+		EquipmentStatusCallback equipmentStatusCallback = EquipmentStatusCallback(),
 		const rclcpp::NodeOptions& options = rclcpp::NodeOptions());
 
 	/// @brief ハートビート周期を取得する
@@ -55,13 +60,18 @@ private:
 	void onHeartbeat() noexcept;
 	void onMonitoredTopic(
 		std::size_t monitorIndex,
-		const std_msgs::msg::String::SharedPtr message) noexcept;
+		const yds_interfaces::msg::EquipmentStatus::SharedPtr message) noexcept;
 	void updateTopicReceptionStatus() noexcept;
 	void notifyTopicReceptionStatus(
 		yds::ros2::TopicReceptionMonitor& monitor) noexcept;
 	void handleTopicReceptionTransition(
 		const QString& topicName,
 		yds::ros2::TopicReceptionTransition transition) noexcept;
+	void handleEquipmentStateTransition(
+		const yds::ros2::EquipmentStatus& previousStatus,
+		const yds::ros2::EquipmentStatus& currentStatus,
+		bool hasPreviousStatus) noexcept;
+	void notifyEquipmentStatus(std::size_t monitorIndex) noexcept;
 	void reportApplicationEvent(
 		yds::ros2::ApplicationEventLevel level,
 		const QString& message) noexcept;
@@ -69,15 +79,19 @@ private:
 	HeartbeatCallback heartbeatCallback_;
 	ApplicationEventCallback applicationEventCallback_;
 	TopicReceptionStatusCallback topicReceptionStatusCallback_;
+	EquipmentStatusCallback equipmentStatusCallback_;
 	std::int64_t heartbeatIntervalMs_;
 	std::int64_t guiStatusCheckIntervalMs_;
 	std::vector<std::string> monitoredTopics_;
 	std::int64_t topicReceptionTimeoutMs_;
 	std::vector<std::unique_ptr<yds::ros2::TopicReceptionMonitor>>
 		topicReceptionMonitors_;
+	std::vector<yds::ros2::EquipmentStatus> latestEquipmentStatuses_;
+	std::vector<bool> hasEquipmentStatuses_;
+	std::vector<bool> equipmentStatusDirty_;
 	std::uint64_t heartbeatCount_;
 	rclcpp::TimerBase::SharedPtr heartbeatTimer_;
-	std::vector<rclcpp::Subscription<std_msgs::msg::String>::SharedPtr>
+	std::vector<rclcpp::Subscription<yds_interfaces::msg::EquipmentStatus>::SharedPtr>
 		monitoredTopicSubscriptions_;
 	rclcpp::TimerBase::SharedPtr topicReceptionStatusTimer_;
 };
