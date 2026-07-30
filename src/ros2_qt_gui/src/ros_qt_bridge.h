@@ -4,7 +4,7 @@
 
 #include <QObject>
 
-#include "application_event.h"
+#include <yds/ros2/application_event.h>
 
 namespace ros2qtgui {
 
@@ -23,7 +23,7 @@ public:
 
 	/// @brief アプリケーションイベントを通知する
 	/// @param event 通知するイベント
-	void notifyApplicationEvent(const ApplicationEvent& event) noexcept;
+	void notifyApplicationEvent(const yds::ros2::ApplicationEvent& event) noexcept;
 
 signals:
 	/// @brief ハートビートが更新されたときに送出される
@@ -32,7 +32,7 @@ signals:
 
 	/// @brief アプリケーションイベントが発生したときに送出される
 	/// @param event 発生したイベント
-	void applicationEventOccurred(const ApplicationEvent& event);
+	void applicationEventOccurred(const yds::ros2::ApplicationEvent& event);
 };
 
 }  // namespace ros2qtgui

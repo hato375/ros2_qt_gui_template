@@ -19,9 +19,13 @@ sudo apt install qtbase5-dev
 
 ```bash
 source /opt/ros/humble/setup.bash
-colcon build --packages-select ros2_qt_gui
+colcon build --packages-up-to ros2_qt_gui
 source install/setup.bash
 ```
+
+ワークスペースには、GUIアプリケーションの`ros2_qt_gui`と、共通ROS 2ライブラリの`yds_ros2`が
+含まれます。`yds_ros2`の公開APIは`yds::ros2`名前空間と`yds/ros2`インクルードパスを使用します。
+共通ライブラリでもQt Core型を基本とし、ROS APIが標準C++型を要求する境界で必要な変換を行います。
 
 ## 起動
 
@@ -63,7 +67,7 @@ ros2 launch ros2_qt_gui ros2_qt_gui.launch.py \
 
 ```bash
 source /opt/ros/humble/setup.bash
-colcon test --packages-select ros2_qt_gui
+colcon test --packages-select yds_ros2 ros2_qt_gui
 colcon test-result --verbose
 ```
 

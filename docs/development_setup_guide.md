@@ -128,9 +128,13 @@ Git設定には`--local`を使用するため、開発者のグローバルGit�
 ```bash
 cd /home/ros/ros2_qt_gui_template
 source /opt/ros/humble/setup.bash
-colcon build --packages-select ros2_qt_gui
+colcon build --packages-up-to ros2_qt_gui
 source install/setup.bash
 ```
+
+`--packages-up-to`を使用すると、GUIパッケージに加えて依存する共通パッケージ`yds_ros2`も
+依存順にビルドされます。`yds_ros2`もQt Core型を公開APIで使用するため、Qt 5の開発パッケージが
+必要です。
 
 ビルド後、実行ファイルは次の場所に生成されます。
 
@@ -193,7 +197,7 @@ YAML内のノード名と実際に起動するノード名が一致しない場�
 
 ```bash
 source /opt/ros/humble/setup.bash
-colcon test --packages-select ros2_qt_gui
+colcon test --packages-select yds_ros2 ros2_qt_gui
 colcon test-result --verbose
 ```
 
@@ -397,6 +401,6 @@ QT_CREATOR_EXECUTABLE=/path/to/qtcreator ./open_qtcreator.sh
 古いビルドが実行されていないか確認し、再ビルドしてください。
 
 ```bash
-colcon build --packages-select ros2_qt_gui
+colcon build --packages-up-to ros2_qt_gui
 source install/setup.bash
 ```

@@ -5,7 +5,7 @@
 
 #include <rclcpp/rclcpp.hpp>
 
-#include "application_event.h"
+#include <yds/ros2/application_event.h>
 
 namespace ros2qtgui {
 
@@ -13,7 +13,7 @@ namespace ros2qtgui {
 class RosNode final : public rclcpp::Node {
 public:
 	using HeartbeatCallback = std::function<void(std::uint64_t)>;
-	using ApplicationEventCallback = std::function<void(const ApplicationEvent&)>;
+	using ApplicationEventCallback = std::function<void(const yds::ros2::ApplicationEvent&)>;
 
 	/// @brief ROS 2ノードを生成する
 	/// @param heartbeatCallback ハートビート更新時に呼び出す関数
@@ -34,7 +34,9 @@ public:
 
 private:
 	void onHeartbeat() noexcept;
-	void reportApplicationEvent(ApplicationEventLevel level, const QString& message) noexcept;
+	void reportApplicationEvent(
+		yds::ros2::ApplicationEventLevel level,
+		const QString& message) noexcept;
 
 	HeartbeatCallback heartbeatCallback_;
 	ApplicationEventCallback applicationEventCallback_;

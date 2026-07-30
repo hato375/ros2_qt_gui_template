@@ -15,18 +15,6 @@ namespace {
 
 constexpr int kMaximumEventLogEntries = 500;
 
-QString eventLevelText(ApplicationEventLevel level) {
-	switch (level) {
-	case ApplicationEventLevel::kInfo:
-		return QStringLiteral("INFO");
-	case ApplicationEventLevel::kWarning:
-		return QStringLiteral("WARN");
-	case ApplicationEventLevel::kError:
-		return QStringLiteral("ERROR");
-	}
-	return QStringLiteral("UNKNOWN");
-}
-
 }  // namespace
 
 MainWindow::MainWindow(int statusCheckIntervalMs)
@@ -61,11 +49,11 @@ void MainWindow::setHeartbeatCount(quint64 count) noexcept {
 	heartbeatLabel_->setText(tr("ROS heartbeat count: %1").arg(count));
 }
 
-void MainWindow::appendApplicationEvent(const ApplicationEvent& event) noexcept {
+void MainWindow::appendApplicationEvent(const yds::ros2::ApplicationEvent& event) noexcept {
 	const QString timestamp = event.timestamp.toString(QStringLiteral("yyyy-MM-dd HH:mm:ss.zzz"));
 	eventLog_->appendPlainText(
 		QStringLiteral("[%1] [%2] %3")
-			.arg(timestamp, eventLevelText(event.level), event.message));
+			.arg(timestamp, yds::ros2::eventLevelText(event.level), event.message));
 }
 
 void MainWindow::updateRosStatus() noexcept {

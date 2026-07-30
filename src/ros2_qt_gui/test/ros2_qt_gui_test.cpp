@@ -13,9 +13,9 @@
 #include <gtest/gtest.h>
 #include <rclcpp/rclcpp.hpp>
 
-#include "application_event.h"
+#include <yds/ros2/executor_runner.h>
+
 #include "main_window.h"
-#include "ros_executor_runner.h"
 #include "ros_node.h"
 #include "ros_qt_bridge.h"
 
@@ -62,7 +62,7 @@ public:
 		  receiverThread_(nullptr) {
 	}
 
-	void receiveApplicationEvent(const ros2qtgui::ApplicationEvent& event) {
+	void receiveApplicationEvent(const yds::ros2::ApplicationEvent& event) {
 		++receivedCount_;
 		lastEvent_ = event;
 		receiverThread_ = QThread::currentThread();
@@ -72,7 +72,7 @@ public:
 		return receivedCount_;
 	}
 
-	const ros2qtgui::ApplicationEvent& lastEvent() const noexcept {
+	const yds::ros2::ApplicationEvent& lastEvent() const noexcept {
 		return lastEvent_;
 	}
 
@@ -82,7 +82,7 @@ public:
 
 private:
 	int receivedCount_;
-	ros2qtgui::ApplicationEvent lastEvent_;
+	yds::ros2::ApplicationEvent lastEvent_;
 	const QThread* receiverThread_;
 };
 
@@ -132,7 +132,7 @@ TEST(RosQtBridgeTest, DeliversApplicationEventOnQtThread) {
 	const QDateTime timestamp = QDateTime::currentDateTime();
 	std::thread notifier([&bridge, timestamp]() {
 		bridge.notifyApplicationEvent({
-			ros2qtgui::ApplicationEventLevel::kWarning,
+			yds::ros2::ApplicationEventLevel::kWarning,
 			timestamp,
 			QStringLiteral("Connection retry")});
 	});
@@ -141,7 +141,7 @@ TEST(RosQtBridgeTest, DeliversApplicationEventOnQtThread) {
 	ASSERT_TRUE(waitFor([&receiver]() {
 		return receiver.receivedCount() == 1;
 	}, 1000));
-	EXPECT_EQ(receiver.lastEvent().level, ros2qtgui::ApplicationEventLevel::kWarning);
+	EXPECT_EQ(receiver.lastEvent().level, yds::ros2::ApplicationEventLevel::kWarning);
 	EXPECT_EQ(receiver.lastEvent().timestamp, timestamp);
 	EXPECT_EQ(receiver.lastEvent().message, QStringLiteral("Connection retry"));
 	EXPECT_EQ(receiver.receiverThread(), QThread::currentThread());
@@ -155,7 +155,7 @@ TEST(MainWindowTest, LimitsApplicationEventLogEntries) {
 
 	for (int index = 0; index < 510; ++index) {
 		mainWindow.appendApplicationEvent({
-			ros2qtgui::ApplicationEventLevel::kInfo,
+			yds::ros2::ApplicationEventLevel::kInfo,
 			QDateTime::currentDateTime(),
 			QStringLiteral("Event %1").arg(index)});
 	}
@@ -207,7 +207,7 @@ TEST(RosNodeParameterTest, RejectsOutOfRangeValues) {
 	});
 }
 
-TEST(RosExecutorRunnerTest, DeliversHeartbeatAndStopsSafely) {
+TEST(ExecutorRunnerIntegrationTest, DeliversHeartbeatAndStopsSafely) {
 	ros2qtgui::RosQtBridge bridge;
 	HeartbeatReceiver receiver;
 	QObject::connect(
@@ -220,7 +220,7 @@ TEST(RosExecutorRunnerTest, DeliversHeartbeatAndStopsSafely) {
 	auto node = std::make_shared<ros2qtgui::RosNode>([&bridge](std::uint64_t count) {
 		bridge.notifyHeartbeat(count);
 	});
-	ros2qtgui::RosExecutorRunner executorRunner(node);
+	yds::ros2::ExecutorRunner executorRunner(node);
 
 	ASSERT_TRUE(waitFor([&receiver]() {
 		return receiver.receivedCount() > 0;

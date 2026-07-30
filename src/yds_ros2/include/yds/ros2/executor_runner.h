@@ -6,24 +6,24 @@
 #include <rclcpp/executor.hpp>
 #include <rclcpp/node.hpp>
 
-namespace ros2qtgui {
+namespace yds::ros2 {
 
 /// @brief ROS 2 Executorを専用スレッドで実行する
 ///
 /// デストラクタでExecutorを停止し、実行スレッドを必ずjoinする。
-class RosExecutorRunner final {
+class ExecutorRunner final {
 public:
 	/// @brief ノードを登録してExecutorスレッドを開始する
 	/// @param node Executorへ登録するROS 2ノード
-	explicit RosExecutorRunner(const std::shared_ptr<rclcpp::Node>& node);
+	explicit ExecutorRunner(const std::shared_ptr<rclcpp::Node>& node);
 
 	/// @brief Executorを停止して実行スレッドをjoinする
-	~RosExecutorRunner();
+	~ExecutorRunner();
 
-	RosExecutorRunner(const RosExecutorRunner&) = delete;
-	RosExecutorRunner& operator=(const RosExecutorRunner&) = delete;
-	RosExecutorRunner(RosExecutorRunner&&) = delete;
-	RosExecutorRunner& operator=(RosExecutorRunner&&) = delete;
+	ExecutorRunner(const ExecutorRunner&) = delete;
+	ExecutorRunner& operator=(const ExecutorRunner&) = delete;
+	ExecutorRunner(ExecutorRunner&&) = delete;
+	ExecutorRunner& operator=(ExecutorRunner&&) = delete;
 
 	/// @brief Executorを停止して実行スレッドをjoinする
 	///
@@ -35,4 +35,4 @@ private:
 	std::thread executorThread_;
 };
 
-}  // namespace ros2qtgui
+}  // namespace yds::ros2

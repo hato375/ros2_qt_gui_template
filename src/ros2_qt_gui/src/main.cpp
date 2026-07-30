@@ -7,8 +7,9 @@
 
 #include <rclcpp/rclcpp.hpp>
 
+#include <yds/ros2/executor_runner.h>
+
 #include "main_window.h"
-#include "ros_executor_runner.h"
 #include "ros_node.h"
 #include "ros_qt_bridge.h"
 
@@ -22,7 +23,7 @@ int main(int argc, char* argv[]) {
 			[&rosQtBridge](std::uint64_t count) {
 				rosQtBridge.notifyHeartbeat(count);
 			},
-			[&rosQtBridge](const ros2qtgui::ApplicationEvent& event) {
+			[&rosQtBridge](const yds::ros2::ApplicationEvent& event) {
 				rosQtBridge.notifyApplicationEvent(event);
 			});
 
@@ -42,17 +43,17 @@ int main(int argc, char* argv[]) {
 			Qt::QueuedConnection);
 
 		rosQtBridge.notifyApplicationEvent({
-			ros2qtgui::ApplicationEventLevel::kInfo,
+			yds::ros2::ApplicationEventLevel::kInfo,
 			QDateTime::currentDateTime(),
 			QStringLiteral("ROS 2 node started")});
 		rosQtBridge.notifyApplicationEvent({
-			ros2qtgui::ApplicationEventLevel::kInfo,
+			yds::ros2::ApplicationEventLevel::kInfo,
 			QDateTime::currentDateTime(),
 			QStringLiteral("Configuration: heartbeat_interval_ms=%1, gui_status_check_interval_ms=%2")
 				.arg(rosNode->heartbeatIntervalMs())
 				.arg(rosNode->guiStatusCheckIntervalMs())});
 
-		ros2qtgui::RosExecutorRunner executorRunner(rosNode);
+		yds::ros2::ExecutorRunner executorRunner(rosNode);
 		mainWindow.show();
 		const int result = application.exec();
 

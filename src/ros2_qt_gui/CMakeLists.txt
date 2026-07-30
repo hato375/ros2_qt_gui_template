@@ -12,18 +12,17 @@ find_package(ament_cmake REQUIRED)
 find_package(rcl_interfaces REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(Qt5 REQUIRED COMPONENTS Widgets)
+find_package(yds_ros2 REQUIRED)
 
 add_executable(${PROJECT_NAME}
-	src/application_event.h
 	src/ros_qt_bridge.h
 	src/main.cpp
 	src/main_window.cpp
-	src/ros_executor_runner.cpp
 	src/ros_node.cpp
 	src/ros_qt_bridge.cpp
 )
 
-target_link_libraries(${PROJECT_NAME} Qt5::Widgets)
+target_link_libraries(${PROJECT_NAME} Qt5::Widgets yds_ros2::yds_ros2)
 ament_target_dependencies(${PROJECT_NAME} rcl_interfaces rclcpp)
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
@@ -39,13 +38,12 @@ if(BUILD_TESTING)
 		SKIP_LINKING_MAIN_LIBRARIES
 		test/ros2_qt_gui_test.cpp
 		src/main_window.cpp
-		src/ros_executor_runner.cpp
 		src/ros_node.cpp
 		src/ros_qt_bridge.cpp
 		src/ros_qt_bridge.h
 	)
 	target_include_directories(ros2_qt_gui_test PRIVATE src)
-	target_link_libraries(ros2_qt_gui_test Qt5::Widgets)
+	target_link_libraries(ros2_qt_gui_test Qt5::Widgets yds_ros2::yds_ros2)
 	ament_target_dependencies(ros2_qt_gui_test rcl_interfaces rclcpp)
 
 	if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")

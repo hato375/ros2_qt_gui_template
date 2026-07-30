@@ -84,7 +84,7 @@
 1. 関連する既存コード、CMake、package.xml、launchファイルを確認する
 2. 変更範囲と既存設計への影響を判断する
 3. 必要最小限の変更を実装する
-4. `colcon build --packages-select ros2_qt_gui`でビルドする
+4. `colcon build --packages-up-to ros2_qt_gui`で依存パッケージを含めてビルドする
 5. 変更内容に応じてlaunch、終了処理、ROS通信、GUI応答性を検証する
 6. 実施した変更、検証結果、残る制約を簡潔に報告する
 

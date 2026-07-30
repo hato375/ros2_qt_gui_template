@@ -111,18 +111,18 @@ void RosNode::onHeartbeat() noexcept {
 	} catch (const std::exception& exception) {
 		RCLCPP_ERROR(get_logger(), "Heartbeat callback failed: %s", exception.what());
 		reportApplicationEvent(
-			ApplicationEventLevel::kError,
+			yds::ros2::ApplicationEventLevel::kError,
 			QStringLiteral("Heartbeat callback failed: %1").arg(exception.what()));
 	} catch (...) {
 		RCLCPP_ERROR(get_logger(), "Heartbeat callback failed with an unknown error");
 		reportApplicationEvent(
-			ApplicationEventLevel::kError,
+			yds::ros2::ApplicationEventLevel::kError,
 			QStringLiteral("Heartbeat callback failed with an unknown error"));
 	}
 }
 
 void RosNode::reportApplicationEvent(
-	ApplicationEventLevel level,
+	yds::ros2::ApplicationEventLevel level,
 	const QString& message) noexcept {
 	if (!applicationEventCallback_) {
 		return;

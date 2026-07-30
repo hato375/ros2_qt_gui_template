@@ -2,7 +2,7 @@
 
 #include <QMainWindow>
 
-#include "application_event.h"
+#include <yds/ros2/application_event.h>
 
 class QLabel;
 class QPlainTextEdit;
@@ -23,7 +23,7 @@ public:
 
 	/// @brief アプリケーションイベントをログ表示へ追加する
 	/// @param event 表示するイベント
-	void appendApplicationEvent(const ApplicationEvent& event) noexcept;
+	void appendApplicationEvent(const yds::ros2::ApplicationEvent& event) noexcept;
 
 private:
 	void updateRosStatus() noexcept;
