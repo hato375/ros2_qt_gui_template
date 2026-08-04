@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>ComponentMonitorDialog</class>
+ <widget class="QDialog" name="ComponentMonitorDialog">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>1200</width>
+    <height>480</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Component monitor</string>
+  </property>
+  <layout class="QVBoxLayout" name="verticalLayout">
+   <item>
+    <widget class="QLabel" name="overallStatusLabel">
+     <property name="text">
+      <string/>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QTableWidget" name="topicStatusTable">
+     <property name="editTriggers">
+      <set>QAbstractItemView::EditTrigger::NoEditTriggers</set>
+     </property>
+     <property name="selectionBehavior">
+      <enum>QAbstractItemView::SelectionBehavior::SelectRows</enum>
+     </property>
+     <attribute name="horizontalHeaderStretchLastSection">
+      <bool>true</bool>
+     </attribute>
+     <column>
+      <property name="text">
+       <string>表示名</string>
+      </property>
+     </column>
+     <column>
+      <property name="text">
+       <string>トピック名</string>
+      </property>
+     </column>
+     <column>
+      <property name="text">
+       <string>コンポーネントID</string>
+      </property>
+     </column>
+     <column>
+      <property name="text">
+       <string>通信状態</string>
+      </property>
+     </column>
+     <column>
+      <property name="text">
+       <string>動作状態</string>
+      </property>
+     </column>
+     <column>
+      <property name="text">
+       <string>エラーコード</string>
+      </property>
+     </column>
+     <column>
+      <property name="text">
+       <string>最終受信日時</string>
+      </property>
+     </column>
+     <column>
+      <property name="text">
+       <string>受信回数</string>
+      </property>
+     </column>
+     <column>
+      <property name="text">
+       <string>メッセージ</string>
+      </property>
+     </column>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

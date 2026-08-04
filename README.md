@@ -24,12 +24,14 @@ source install/setup.bash
 ```
 
 ワークスペースには、GUIアプリケーションの`ros2_qt_gui`、共通ROS 2ライブラリの`yds_ros2`、
-共通メッセージ定義の`yds_interfaces`、およびロジック系サンプルの`sample_processor`が含まれます。
+再利用可能な監視ダイアログを提供する`yds_ros2_widgets`、共通メッセージ定義の`yds_interfaces`、
+およびロジック系サンプルの`sample_processor`が含まれます。
 `yds_ros2`の公開APIは
 `yds::ros2`名前空間と`yds/ros2`インクルードパスを使用します。
 共通ライブラリでもQt Core型を基本とし、ROS APIが標準C++型を要求する境界で必要な変換を行います。
 `yds::ros2::TopicReceptionMonitor`はROSメッセージ型に依存せず、camera、PLC、Supervisorなどの
 ノードから共通利用できます。
+監視ダイアログの組み込み方法は`docs/component_monitor_dialog_guide.md`を参照してください。
 
 ## 起動
 
@@ -114,7 +116,7 @@ ros2 launch ros2_qt_gui ros2_qt_gui.launch.py \
 
 ```bash
 source /opt/ros/humble/setup.bash
-colcon test --packages-select yds_interfaces yds_ros2 ros2_qt_gui sample_processor
+colcon test --packages-select yds_interfaces yds_ros2 yds_ros2_widgets ros2_qt_gui sample_processor
 colcon test-result --verbose
 ```
 

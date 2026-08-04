@@ -13,6 +13,7 @@
 #include <QLabel>
 #include <QObject>
 #include <QPlainTextEdit>
+#include <QPushButton>
 #include <QTableWidget>
 #include <QThread>
 
@@ -336,6 +337,28 @@ TEST(MainWindowTest, LimitsApplicationEventLogEntries) {
 	EXPECT_TRUE(eventLog->toPlainText().contains(QStringLiteral("Event 509")));
 }
 
+TEST(MainWindowTest, OpensReusableComponentMonitorDialog) {
+	ros2qtgui::MainWindow mainWindow(200);
+	auto* button = mainWindow.findChild<QPushButton*>(
+		QStringLiteral("showComponentMonitorButton"));
+	ASSERT_NE(button, nullptr);
+	auto& dialog = mainWindow.componentMonitorDialog();
+	EXPECT_FALSE(dialog.isVisible());
+
+	button->click();
+	QApplication::processEvents();
+	EXPECT_TRUE(dialog.isVisible());
+
+	dialog.close();
+	EXPECT_FALSE(dialog.isVisible());
+	mainWindow.setComponentDisplayName(
+		QStringLiteral("camera/status"),
+		QStringLiteral("Camera"));
+	auto* table = dialog.findChild<QTableWidget*>(QStringLiteral("topicStatusTable"));
+	ASSERT_NE(table, nullptr);
+	EXPECT_EQ(table->rowCount(), 1);
+}
+
 TEST(MainWindowTest, DisplaysMultipleTopicStatuses) {
 	ros2qtgui::MainWindow mainWindow(200);
 	auto* topicStatusTable = mainWindow.findChild<QTableWidget*>(
@@ -411,7 +434,7 @@ TEST(MainWindowTest, AggregatesOverallStatus) {
 	ASSERT_NE(overallStatusLabel, nullptr);
 	EXPECT_EQ(
 		overallStatusLabel->text(),
-		QStringLiteral("Overall status: WAITING (0/0 receiving)"));
+		QStringLiteral("全体状態: 待機中（受信中 0/0）"));
 
 	mainWindow.setComponentDisplayName(
 		QStringLiteral("camera/status"),
@@ -421,7 +444,7 @@ TEST(MainWindowTest, AggregatesOverallStatus) {
 		QStringLiteral("PLC"));
 	EXPECT_EQ(
 		overallStatusLabel->text(),
-		QStringLiteral("Overall status: WAITING (0/2 receiving)"));
+		QStringLiteral("全体状態: 待機中（受信中 0/2）"));
 
 	mainWindow.setTopicReceptionStatus({
 		QStringLiteral("camera/status"),
@@ -431,7 +454,7 @@ TEST(MainWindowTest, AggregatesOverallStatus) {
 		QString()});
 	EXPECT_EQ(
 		overallStatusLabel->text(),
-		QStringLiteral("Overall status: WARNING (1/2 receiving)"));
+		QStringLiteral("全体状態: 警告（受信中 1/2）"));
 	mainWindow.setComponentStatus({
 		QStringLiteral("camera/status"),
 		QStringLiteral("camera-1"),
@@ -441,7 +464,7 @@ TEST(MainWindowTest, AggregatesOverallStatus) {
 		QDateTime::currentDateTime()});
 	EXPECT_EQ(
 		overallStatusLabel->text(),
-		QStringLiteral("Overall status: WAITING (1/2 receiving)"));
+		QStringLiteral("全体状態: 待機中（受信中 1/2）"));
 
 	mainWindow.setTopicReceptionStatus({
 		QStringLiteral("plc/status"),
@@ -458,7 +481,7 @@ TEST(MainWindowTest, AggregatesOverallStatus) {
 		QDateTime::currentDateTime()});
 	EXPECT_EQ(
 		overallStatusLabel->text(),
-		QStringLiteral("Overall status: NORMAL (2/2 receiving)"));
+		QStringLiteral("全体状態: 正常（受信中 2/2）"));
 	EXPECT_TRUE(overallStatusLabel->styleSheet().contains(QStringLiteral("#C8E6C9")));
 
 	mainWindow.setComponentStatus({
@@ -470,7 +493,7 @@ TEST(MainWindowTest, AggregatesOverallStatus) {
 		QDateTime::currentDateTime()});
 	EXPECT_EQ(
 		overallStatusLabel->text(),
-		QStringLiteral("Overall status: ERROR (2/2 receiving)"));
+		QStringLiteral("全体状態: 異常（受信中 2/2）"));
 
 	mainWindow.setComponentStatus({
 		QStringLiteral("camera/status"),
@@ -481,7 +504,7 @@ TEST(MainWindowTest, AggregatesOverallStatus) {
 		QDateTime::currentDateTime()});
 	EXPECT_EQ(
 		overallStatusLabel->text(),
-		QStringLiteral("Overall status: WARNING (2/2 receiving)"));
+		QStringLiteral("全体状態: 警告（受信中 2/2）"));
 	EXPECT_TRUE(overallStatusLabel->styleSheet().contains(QStringLiteral("#FFE082")));
 
 	mainWindow.setTopicReceptionStatus({
@@ -492,7 +515,7 @@ TEST(MainWindowTest, AggregatesOverallStatus) {
 		QString()});
 	EXPECT_EQ(
 		overallStatusLabel->text(),
-		QStringLiteral("Overall status: ERROR (1/2 receiving)"));
+		QStringLiteral("全体状態: 異常（受信中 1/2）"));
 	EXPECT_TRUE(overallStatusLabel->styleSheet().contains(QStringLiteral("#C62828")));
 
 	mainWindow.setTopicReceptionStatus({
@@ -510,7 +533,7 @@ TEST(MainWindowTest, AggregatesOverallStatus) {
 		QDateTime::currentDateTime()});
 	EXPECT_EQ(
 		overallStatusLabel->text(),
-		QStringLiteral("Overall status: NORMAL (2/2 receiving)"));
+		QStringLiteral("全体状態: 正常（受信中 2/2）"));
 }
 
 TEST(MainWindowTest, UsesColorsForEveryComponentState) {

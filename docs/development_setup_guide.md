@@ -132,9 +132,9 @@ colcon build --packages-up-to ros2_qt_gui
 source install/setup.bash
 ```
 
-`--packages-up-to`を使用すると、GUIパッケージに加えて依存する`yds_interfaces`と`yds_ros2`も
-依存順にビルドされます。`yds_ros2`もQt Core型を公開APIで使用するため、Qt 5の開発パッケージが
-必要です。
+`--packages-up-to`を使用すると、GUIパッケージに加えて依存する`yds_interfaces`、`yds_ros2`、
+`yds_ros2_widgets`も依存順にビルドされます。共通ライブラリはQt Core型、共通監視ダイアログは
+Qt Widgetsを使用するため、Qt 5の開発パッケージが必要です。
 
 ビルド後、実行ファイルは次の場所に生成されます。
 
@@ -202,14 +202,14 @@ YAML内のノード名と実際に起動するノード名が一致しない場�
 
 ```bash
 source /opt/ros/humble/setup.bash
-colcon test --packages-select yds_interfaces yds_ros2 ros2_qt_gui
+colcon test --packages-select yds_interfaces yds_ros2 yds_ros2_widgets ros2_qt_gui
 colcon test-result --verbose
 ```
 
 ロジック系サンプルを含める場合は、`sample_processor`もテスト対象へ追加します。
 
 ```bash
-colcon test --packages-select yds_interfaces yds_ros2 ros2_qt_gui sample_processor
+colcon test --packages-select yds_interfaces yds_ros2 yds_ros2_widgets ros2_qt_gui sample_processor
 ```
 
 現在のテストは次を確認します。

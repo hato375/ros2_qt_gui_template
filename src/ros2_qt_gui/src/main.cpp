@@ -9,6 +9,7 @@
 #include <rclcpp/rclcpp.hpp>
 
 #include <yds/ros2/executor_runner.h>
+#include <yds/ros2/widgets/component_monitor_dialog.h>
 
 #include "main_window.h"
 #include "ros_node.h"
@@ -36,6 +37,7 @@ int main(int argc, char* argv[]) {
 
 		ros2qtgui::MainWindow mainWindow(
 			static_cast<int>(rosNode->guiStatusCheckIntervalMs()));
+		auto& componentMonitorDialog = mainWindow.componentMonitorDialog();
 		QObject::connect(
 			&rosQtBridge,
 			&ros2qtgui::RosQtBridge::heartbeatUpdated,
@@ -51,19 +53,18 @@ int main(int argc, char* argv[]) {
 		QObject::connect(
 			&rosQtBridge,
 			&ros2qtgui::RosQtBridge::topicReceptionStatusUpdated,
-			&mainWindow,
-			&ros2qtgui::MainWindow::setTopicReceptionStatus,
+			&componentMonitorDialog,
+			&yds::ros2::widgets::ComponentMonitorDialog::setTopicReceptionStatus,
 			Qt::QueuedConnection);
 		QObject::connect(
 			&rosQtBridge,
 			&ros2qtgui::RosQtBridge::componentStatusUpdated,
-			&mainWindow,
-			&ros2qtgui::MainWindow::setComponentStatus,
+			&componentMonitorDialog,
+			&yds::ros2::widgets::ComponentMonitorDialog::setComponentStatus,
 			Qt::QueuedConnection);
-
 		QStringList componentMonitorDescriptions;
 		for (const auto& configuration : rosNode->componentMonitorConfigurations()) {
-			mainWindow.setComponentDisplayName(
+			componentMonitorDialog.setComponentDisplayName(
 				configuration.statusTopicName,
 				configuration.displayName);
 			componentMonitorDescriptions.push_back(

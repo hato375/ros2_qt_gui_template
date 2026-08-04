@@ -14,6 +14,7 @@ find_package(rclcpp REQUIRED)
 find_package(yds_interfaces REQUIRED)
 find_package(Qt5 REQUIRED COMPONENTS Widgets)
 find_package(yds_ros2 REQUIRED)
+find_package(yds_ros2_widgets REQUIRED)
 
 add_executable(${PROJECT_NAME}
 	src/ros_qt_bridge.h
@@ -23,7 +24,12 @@ add_executable(${PROJECT_NAME}
 	src/ros_qt_bridge.cpp
 )
 
-target_link_libraries(${PROJECT_NAME} Qt5::Widgets yds_ros2::yds_ros2)
+target_link_libraries(
+	${PROJECT_NAME}
+	Qt5::Widgets
+	yds_ros2::yds_ros2
+	yds_ros2_widgets::yds_ros2_widgets
+)
 ament_target_dependencies(${PROJECT_NAME} rcl_interfaces rclcpp yds_interfaces)
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
@@ -44,7 +50,12 @@ if(BUILD_TESTING)
 		src/ros_qt_bridge.h
 	)
 	target_include_directories(ros2_qt_gui_test PRIVATE src)
-	target_link_libraries(ros2_qt_gui_test Qt5::Widgets yds_ros2::yds_ros2)
+	target_link_libraries(
+		ros2_qt_gui_test
+		Qt5::Widgets
+		yds_ros2::yds_ros2
+		yds_ros2_widgets::yds_ros2_widgets
+	)
 	ament_target_dependencies(ros2_qt_gui_test rcl_interfaces rclcpp yds_interfaces)
 
 	if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")

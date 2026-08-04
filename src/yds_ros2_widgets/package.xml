@@ -2,22 +2,16 @@
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd"
              schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-	<name>ros2_qt_gui</name>
+	<name>yds_ros2_widgets</name>
 	<version>0.1.0</version>
-	<description>ROS 2とQtを連携させるシンプルなGUIアプリケーション</description>
+	<description>YOODS製ROS 2アプリケーションで共通利用するQt Widgets</description>
 	<maintainer email="developer@example.com">Developer</maintainer>
 	<license>Apache-2.0</license>
 
 	<buildtool_depend>ament_cmake</buildtool_depend>
 
-	<depend>rcl_interfaces</depend>
-	<depend>rclcpp</depend>
-	<depend>yds_interfaces</depend>
+	<depend>qtbase5-dev</depend>
 	<depend>yds_ros2</depend>
-	<depend>yds_ros2_widgets</depend>
-
-	<exec_depend>launch</exec_depend>
-	<exec_depend>launch_ros</exec_depend>
 
 	<test_depend>ament_cmake_gtest</test_depend>
 
