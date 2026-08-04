@@ -137,6 +137,19 @@ const auto status = monitor.takeStatusUpdate();
 返された状態遷移に応じてログ、通知、または停止判断を行います。ROSメッセージ型はノード間通信、
 Qt型はアプリケーション内という境界を保ちます。
 
+`EquipmentStatus`の送受信変換には、`yds_ros2`の共通APIを使用できます。
+
+```cpp
+#include <yds/ros2/equipment_status_conversion.h>
+
+const auto qtStatus =
+	yds::ros2::equipmentStatusFromRos(QStringLiteral("camera/status"), rosMessage);
+const auto publishMessage = yds::ros2::equipmentStatusToRos(qtStatus);
+```
+
+ROSメッセージの`header.stamp`がゼロの場合、変換後の`timestamp`は無効な`QDateTime`になります。
+Supervisorはこれを受信時刻で補完します。送信ノードでは、可能な限り状態を生成した時刻を設定します。
+
 ## 6. 状態遷移
 
 ```text

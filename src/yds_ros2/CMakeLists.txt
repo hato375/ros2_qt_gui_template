@@ -10,8 +10,10 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(Qt5 REQUIRED COMPONENTS Core)
+find_package(yds_interfaces REQUIRED)
 
 add_library(${PROJECT_NAME}
+	src/equipment_status_conversion.cpp
 	src/executor_runner.cpp
 	src/topic_reception_monitor.cpp
 )
@@ -22,7 +24,7 @@ target_include_directories(${PROJECT_NAME}
 		$<INSTALL_INTERFACE:include>
 )
 target_link_libraries(${PROJECT_NAME} Qt5::Core)
-ament_target_dependencies(${PROJECT_NAME} rclcpp)
+ament_target_dependencies(${PROJECT_NAME} rclcpp yds_interfaces)
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
 	target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra -Wpedantic)
@@ -39,7 +41,7 @@ if(BUILD_TESTING)
 		test/topic_reception_monitor_test.cpp
 	)
 	target_link_libraries(yds_ros2_test ${PROJECT_NAME})
-	ament_target_dependencies(yds_ros2_test rclcpp)
+	ament_target_dependencies(yds_ros2_test rclcpp yds_interfaces)
 
 	if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
 		target_compile_options(yds_ros2_test PRIVATE -Wall -Wextra -Wpedantic)
@@ -62,6 +64,6 @@ install(
 )
 
 ament_export_targets(export_${PROJECT_NAME} HAS_LIBRARY_TARGET)
-ament_export_dependencies(Qt5Core rclcpp)
+ament_export_dependencies(Qt5Core rclcpp yds_interfaces)
 
 ament_package()

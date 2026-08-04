@@ -13,6 +13,8 @@
 #include <rcl_interfaces/msg/integer_range.hpp>
 #include <rcl_interfaces/msg/parameter_descriptor.hpp>
 
+#include <yds/ros2/equipment_status_conversion.h>
+
 namespace ros2qtgui {
 
 namespace {
@@ -62,38 +64,6 @@ void validateInterval(
 			parameterName + " must be between " + std::to_string(minimum) + " and " +
 			std::to_string(maximum) + " milliseconds");
 	}
-}
-
-yds::ros2::EquipmentState equipmentStateFromRos(std::uint8_t state) noexcept {
-	switch (state) {
-	case yds_interfaces::msg::EquipmentStatus::STATE_INITIALIZING:
-		return yds::ros2::EquipmentState::kInitializing;
-	case yds_interfaces::msg::EquipmentStatus::STATE_READY:
-		return yds::ros2::EquipmentState::kReady;
-	case yds_interfaces::msg::EquipmentStatus::STATE_RUNNING:
-		return yds::ros2::EquipmentState::kRunning;
-	case yds_interfaces::msg::EquipmentStatus::STATE_WARNING:
-		return yds::ros2::EquipmentState::kWarning;
-	case yds_interfaces::msg::EquipmentStatus::STATE_ERROR:
-		return yds::ros2::EquipmentState::kError;
-	case yds_interfaces::msg::EquipmentStatus::STATE_CRITICAL:
-		return yds::ros2::EquipmentState::kCritical;
-	case yds_interfaces::msg::EquipmentStatus::STATE_STOPPED:
-		return yds::ros2::EquipmentState::kStopped;
-	case yds_interfaces::msg::EquipmentStatus::STATE_UNKNOWN:
-	default:
-		return yds::ros2::EquipmentState::kUnknown;
-	}
-}
-
-QDateTime timestampFromRos(const builtin_interfaces::msg::Time& timestamp) noexcept {
-	if (timestamp.sec == 0 && timestamp.nanosec == 0) {
-		return QDateTime::currentDateTime();
-	}
-	const qint64 milliseconds =
-		static_cast<qint64>(timestamp.sec) * 1000 +
-		static_cast<qint64>(timestamp.nanosec) / 1000000;
-	return QDateTime::fromMSecsSinceEpoch(milliseconds, Qt::UTC).toLocalTime();
 }
 
 }  // namespace
@@ -265,13 +235,11 @@ void RosNode::onMonitoredTopic(
 		auto& monitor = *topicReceptionMonitors_.at(monitorIndex);
 		const auto previousStatus = latestEquipmentStatuses_.at(monitorIndex);
 		const bool hasPreviousStatus = hasEquipmentStatuses_.at(monitorIndex);
-		yds::ros2::EquipmentStatus status{
-			monitor.status().topicName,
-			QString::fromStdString(message->equipment_id),
-			equipmentStateFromRos(message->state),
-			static_cast<qint32>(message->error_code),
-			QString::fromStdString(message->message),
-			timestampFromRos(message->header.stamp)};
+		auto status =
+			yds::ros2::equipmentStatusFromRos(monitor.status().topicName, *message);
+		if (!status.timestamp.isValid()) {
+			status.timestamp = QDateTime::currentDateTime();
+		}
 		latestEquipmentStatuses_.at(monitorIndex) = status;
 		hasEquipmentStatuses_.at(monitorIndex) = true;
 		equipmentStatusDirty_.at(monitorIndex) = true;
