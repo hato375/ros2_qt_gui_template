@@ -6,6 +6,7 @@
 #include <thread>
 
 #include <QApplication>
+#include <QColor>
 #include <QElapsedTimer>
 #include <QEventLoop>
 #include <QHash>
@@ -377,6 +378,97 @@ TEST(MainWindowTest, DisplaysMultipleTopicStatuses) {
 	EXPECT_EQ(topicStatusTable->item(1, 3)->text(), QStringLiteral("ERROR"));
 	EXPECT_EQ(topicStatusTable->item(1, 4)->text(), QStringLiteral("1001"));
 	EXPECT_EQ(topicStatusTable->item(1, 7)->text(), QStringLiteral("connection failed"));
+	EXPECT_EQ(
+		topicStatusTable->item(0, 2)->background().color(),
+		QColor(QStringLiteral("#C8E6C9")));
+	EXPECT_EQ(
+		topicStatusTable->item(1, 2)->background().color(),
+		QColor(QStringLiteral("#C62828")));
+	EXPECT_EQ(
+		topicStatusTable->item(1, 2)->foreground().color(),
+		QColor(QStringLiteral("#FFFFFF")));
+	EXPECT_EQ(
+		topicStatusTable->item(0, 3)->background().color(),
+		QColor(QStringLiteral("#C8E6C9")));
+	EXPECT_EQ(
+		topicStatusTable->item(1, 3)->background().color(),
+		QColor(QStringLiteral("#EF9A9A")));
+}
+
+TEST(MainWindowTest, UsesColorsForEveryEquipmentState) {
+	struct StateColor {
+		yds::ros2::EquipmentState state;
+		const char* backgroundColor;
+		const char* foregroundColor;
+	};
+	const StateColor stateColors[] = {
+		{yds::ros2::EquipmentState::kUnknown, "#E0E0E0", "#000000"},
+		{yds::ros2::EquipmentState::kInitializing, "#BBDEFB", "#000000"},
+		{yds::ros2::EquipmentState::kReady, "#DCEDC8", "#000000"},
+		{yds::ros2::EquipmentState::kRunning, "#C8E6C9", "#000000"},
+		{yds::ros2::EquipmentState::kWarning, "#FFE082", "#000000"},
+		{yds::ros2::EquipmentState::kError, "#EF9A9A", "#000000"},
+		{yds::ros2::EquipmentState::kCritical, "#B71C1C", "#FFFFFF"},
+		{yds::ros2::EquipmentState::kStopped, "#CFD8DC", "#000000"},
+	};
+
+	ros2qtgui::MainWindow mainWindow(200);
+	auto* topicStatusTable = mainWindow.findChild<QTableWidget*>(
+		QStringLiteral("topicStatusTable"));
+	ASSERT_NE(topicStatusTable, nullptr);
+
+	for (const auto& stateColor : stateColors) {
+		mainWindow.setEquipmentStatus({
+			QStringLiteral("camera/status"),
+			QStringLiteral("camera-1"),
+			stateColor.state,
+			0,
+			QString(),
+			QDateTime::currentDateTime()});
+		const auto* stateItem = topicStatusTable->item(0, 3);
+		ASSERT_NE(stateItem, nullptr);
+		EXPECT_EQ(
+			stateItem->background().color(),
+			QColor(QString::fromLatin1(stateColor.backgroundColor)));
+		EXPECT_EQ(
+			stateItem->foreground().color(),
+			QColor(QString::fromLatin1(stateColor.foregroundColor)));
+	}
+}
+
+TEST(MainWindowTest, UsesColorsForEveryReceptionState) {
+	struct StateColor {
+		yds::ros2::TopicReceptionState state;
+		const char* backgroundColor;
+		const char* foregroundColor;
+	};
+	const StateColor stateColors[] = {
+		{yds::ros2::TopicReceptionState::kWaiting, "#E0E0E0", "#000000"},
+		{yds::ros2::TopicReceptionState::kReceiving, "#C8E6C9", "#000000"},
+		{yds::ros2::TopicReceptionState::kTimedOut, "#C62828", "#FFFFFF"},
+	};
+
+	ros2qtgui::MainWindow mainWindow(200);
+	auto* topicStatusTable = mainWindow.findChild<QTableWidget*>(
+		QStringLiteral("topicStatusTable"));
+	ASSERT_NE(topicStatusTable, nullptr);
+
+	for (const auto& stateColor : stateColors) {
+		mainWindow.setTopicReceptionStatus({
+			QStringLiteral("camera/status"),
+			stateColor.state,
+			QDateTime(),
+			0,
+			QString()});
+		const auto* stateItem = topicStatusTable->item(0, 2);
+		ASSERT_NE(stateItem, nullptr);
+		EXPECT_EQ(
+			stateItem->background().color(),
+			QColor(QString::fromLatin1(stateColor.backgroundColor)));
+		EXPECT_EQ(
+			stateItem->foreground().color(),
+			QColor(QString::fromLatin1(stateColor.foregroundColor)));
+	}
 }
 
 TEST(RosNodeParameterTest, UsesDefaultValues) {
