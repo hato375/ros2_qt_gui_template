@@ -1,15 +1,14 @@
 #pragma once
 
 #include <chrono>
-#include <mutex>
+#include <memory>
 #include <string>
 
 #include <QString>
 
 #include <rclcpp/rclcpp.hpp>
-#include <yds_interfaces/msg/component_status.hpp>
-
 #include <yds/ros2/component_status.h>
+#include <yds/ros2/component_status_publisher.h>
 
 namespace yds::ros2 {
 
@@ -64,15 +63,7 @@ public:
 	std::chrono::milliseconds statusPublishInterval() const noexcept;
 
 private:
-	bool publishComponentStatus() noexcept;
-
-	QString componentId_;
-	QString statusTopicName_;
-	std::chrono::milliseconds statusPublishInterval_;
-	mutable std::mutex statusMutex_;
-	ComponentStatus componentStatus_;
-	rclcpp::Publisher<yds_interfaces::msg::ComponentStatus>::SharedPtr statusPublisher_;
-	rclcpp::TimerBase::SharedPtr statusTimer_;
+	std::unique_ptr<ComponentStatusPublisher> statusPublisher_;
 };
 
 }  // namespace yds::ros2

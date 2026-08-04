@@ -10,6 +10,7 @@
 #include <yds_interfaces/msg/component_status.hpp>
 
 #include <yds/ros2/component_status_node.h>
+#include <yds/ros2/component_status_publisher.h>
 #include <yds/ros2/executor_runner.h>
 
 namespace {
@@ -26,6 +27,47 @@ public:
 			100ms,
 			options) {}
 };
+
+TEST(ComponentStatusPublisherTest, AddsStatusPublishingToRegularNode) {
+	auto node = std::make_shared<rclcpp::Node>("component_status_publisher_test");
+	yds::ros2::ComponentStatusPublisher publisher(
+		*node,
+		{
+			QStringLiteral("circle-detector-1"),
+			QStringLiteral("circle_detector/status"),
+			250ms});
+
+	EXPECT_EQ(publisher.componentId(), QStringLiteral("circle-detector-1"));
+	EXPECT_EQ(publisher.statusTopicName(), QStringLiteral("circle_detector/status"));
+	EXPECT_EQ(publisher.publishInterval(), 250ms);
+	EXPECT_EQ(publisher.status().state, yds::ros2::ComponentState::kInitializing);
+	EXPECT_TRUE(publisher.setStatus(
+		yds::ros2::ComponentState::kRunning,
+		0,
+		QStringLiteral("Detecting circles")));
+	EXPECT_EQ(publisher.status().state, yds::ros2::ComponentState::kRunning);
+	EXPECT_EQ(publisher.status().message, QStringLiteral("Detecting circles"));
+}
+
+TEST(ComponentStatusPublisherTest, RejectsInvalidConfiguration) {
+	auto node = std::make_shared<rclcpp::Node>("component_status_publisher_invalid_test");
+
+	EXPECT_THROW(
+		yds::ros2::ComponentStatusPublisher(
+			*node,
+			{QString(), QStringLiteral("status"), 1000ms}),
+		std::invalid_argument);
+	EXPECT_THROW(
+		yds::ros2::ComponentStatusPublisher(
+			*node,
+			{QStringLiteral("component"), QString(), 1000ms}),
+		std::invalid_argument);
+	EXPECT_THROW(
+		yds::ros2::ComponentStatusPublisher(
+			*node,
+			{QStringLiteral("component"), QStringLiteral("status"), 99ms}),
+		std::out_of_range);
+}
 
 TEST(ComponentStatusNodeTest, UsesParameterOverrides) {
 	rclcpp::NodeOptions options;

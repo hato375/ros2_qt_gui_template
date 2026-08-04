@@ -2,9 +2,9 @@
 
 ## 1. 目的
 
-`yds::ros2::ComponentStatusNode`は、camera、PLCなどの物理設備や、画像処理、点群生成などの
-ロジック機能を実装するノードから
-`yds_interfaces/msg/ComponentStatus`を共通の方法で通知するための基底クラスです。
+`yds::ros2::ComponentStatusPublisher`は、camera、PLCなどの物理設備や、画像処理、点群生成などの
+ロジック機能を実装するノードから`yds_interfaces/msg/ComponentStatus`を共通の方法で通知します。
+通常の`rclcpp::Node`では、便利な基底クラス`yds::ros2::ComponentStatusNode`を利用できます。
 
 このクラスは次の処理を提供します。
 
@@ -15,7 +15,11 @@
 - 複数スレッドからの状態更新に対する排他制御
 - 最新状態を保持するReliable、Transient Local QoS
 
-設備固有の初期化、復旧処理、安全停止判断は派生ノードの責務です。
+コンポーネント固有の初期化、復旧処理、安全停止判断は利用するノードの責務です。
+
+状態通知の実装本体は`ComponentStatusPublisher`へ分離されています。Node Interfaceを介してPublisherと
+Timerを登録するため、`rclcpp::Node`を継承済みのクラスや、将来Lifecycle Nodeを採用するクラスでも
+同じ状態管理処理を再利用できます。Lifecycle状態とコンポーネント状態は統合せず、別の軸として扱います。
 
 ## 2. 派生ノードの実装例
 
@@ -76,7 +80,37 @@ camera_node:
 Supervisorの受信タイムアウトは、ネットワーク遅延や処理遅延を考慮し、Publish周期より十分長く
 設定してください。例えばPublish周期が1000ミリ秒の場合、3000ミリ秒程度から調整します。
 
-## 4. 状態とエラーコード
+## 4. 既存のNodeへ機能を追加する
+
+すでに別の基底クラスを継承している場合は、`ComponentStatusPublisher`をメンバーとして所有します。
+この利用方法では、設定値の検証とROSパラメータの宣言は所有するノードの責務です。
+
+```cpp
+#include <memory>
+
+#include <yds/ros2/component_status_publisher.h>
+
+class CircleDetectorNode final : public rclcpp::Node {
+public:
+	CircleDetectorNode()
+		: rclcpp::Node("circle_detector_node"),
+		  statusPublisher_(std::make_unique<yds::ros2::ComponentStatusPublisher>(
+			  *this,
+			  yds::ros2::ComponentStatusPublisherConfiguration{
+				  QStringLiteral("circle-detector-1"),
+				  QStringLiteral("circle_detector/status"),
+				  std::chrono::milliseconds(1000)})) {}
+
+	void notifyRunning() {
+		statusPublisher_->setStatus(yds::ros2::ComponentState::kRunning);
+	}
+
+private:
+	std::unique_ptr<yds::ros2::ComponentStatusPublisher> statusPublisher_;
+};
+```
+
+## 5. 状態とエラーコード
 
 - 正常な状態では`errorCode`を`0`にします。
 - `WARNING`、`ERROR`、`CRITICAL`では、設備ごとに定義したエラーコードと運用者向けメッセージを設定します。
@@ -90,7 +124,7 @@ setComponentStatus(yds::ros2::ComponentState::kCritical, 2001, QStringLiteral("E
 setComponentStatus(yds::ros2::ComponentState::kReady, 0, QString());
 ```
 
-## 5. QoS
+## 6. QoS
 
 Publisherは`KeepLast(1)`、`Reliable`、`Transient Local`を使用します。監視ノードが同じQoSで
 Subscribeすると、設備ノードより後に起動した場合も、保持された最新状態を受信できます。
