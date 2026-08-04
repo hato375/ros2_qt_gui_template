@@ -51,6 +51,21 @@ ros2 launch sample_processor component_status_demo.launch.py
 GUIは`sample_processor/status`だけを監視するデモ専用設定で起動します。GUI上で通信状態が
 `RECEIVING`、コンポーネント状態が`READY`から`RUNNING`へ変化することを確認できます。
 
+別のターミナルからテスト用Serviceを呼び出すと、異常表示と復旧も確認できます。
+
+```bash
+source /opt/ros/humble/setup.bash
+source install/setup.bash
+
+ros2 service call /sample_processor_node/set_warning std_srvs/srv/Trigger {}
+ros2 service call /sample_processor_node/set_error std_srvs/srv/Trigger {}
+ros2 service call /sample_processor_node/recover std_srvs/srv/Trigger {}
+```
+
+`set_warning`は`WARNING`とエラーコード`1001`、`set_error`は`ERROR`とエラーコード`2001`を通知します。
+`recover`を呼ぶと、エラーコードを`0`へ戻して`RUNNING`へ復旧します。これらはデモ専用Serviceであり、
+実案件の状態変更を外部から自由に操作するための共通APIではありません。
+
 ## 5. パラメータ
 
 | パラメータ | 既定値 | 範囲 | 用途 |

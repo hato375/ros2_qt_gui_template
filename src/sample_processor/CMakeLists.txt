@@ -10,6 +10,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 find_package(ament_cmake REQUIRED)
 find_package(rcl_interfaces REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(std_srvs REQUIRED)
 find_package(Qt5 REQUIRED COMPONENTS Core)
 find_package(yds_interfaces REQUIRED)
 find_package(yds_ros2 REQUIRED)
@@ -22,7 +23,7 @@ target_include_directories(sample_processor_node
 		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
 )
 target_link_libraries(sample_processor_node Qt5::Core yds_ros2::yds_ros2)
-ament_target_dependencies(sample_processor_node rcl_interfaces rclcpp)
+ament_target_dependencies(sample_processor_node rcl_interfaces rclcpp std_srvs)
 
 add_executable(sample_processor
 	src/main.cpp
@@ -46,7 +47,7 @@ if(BUILD_TESTING)
 		test/sample_processor_test.cpp
 	)
 	target_link_libraries(sample_processor_test sample_processor_node)
-	ament_target_dependencies(sample_processor_test rclcpp yds_interfaces)
+	ament_target_dependencies(sample_processor_test rclcpp std_srvs yds_interfaces)
 
 	if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
 		target_compile_options(sample_processor_test PRIVATE -Wall -Wextra -Wpedantic)

@@ -1,4 +1,5 @@
 #include <chrono>
+#include <future>
 #include <memory>
 #include <mutex>
 #include <thread>
@@ -6,6 +7,7 @@
 #include <gtest/gtest.h>
 
 #include <rclcpp/rclcpp.hpp>
+#include <std_srvs/srv/trigger.hpp>
 #include <yds_interfaces/msg/component_status.hpp>
 
 #include <sample_processor/sample_processor_node.h>
@@ -38,16 +40,48 @@ TEST(SampleProcessorNodeTest, PublishesReadyAndRunningStatus) {
 	ASSERT_NE(subscription, nullptr);
 	yds::ros2::ExecutorRunner executorRunner(node);
 
-	const auto deadline = std::chrono::steady_clock::now() + 2s;
-	while (std::chrono::steady_clock::now() < deadline) {
-		{
-			std::lock_guard<std::mutex> lock(receivedMutex);
-			if (receivedRunning) {
-				break;
+	const auto waitForState = [&](std::uint8_t expectedState) {
+		const auto deadline = std::chrono::steady_clock::now() + 2s;
+		while (std::chrono::steady_clock::now() < deadline) {
+			{
+				std::lock_guard<std::mutex> lock(receivedMutex);
+				if (latestStatus.state == expectedState) {
+					return true;
+				}
 			}
+			std::this_thread::sleep_for(10ms);
 		}
-		std::this_thread::sleep_for(10ms);
-	}
+		return false;
+	};
+	ASSERT_TRUE(waitForState(yds_interfaces::msg::ComponentStatus::STATE_RUNNING));
+
+	const auto setWarningClient = node->create_client<std_srvs::srv::Trigger>(
+		"~/set_warning");
+	const auto setErrorClient = node->create_client<std_srvs::srv::Trigger>(
+		"~/set_error");
+	const auto recoverClient = node->create_client<std_srvs::srv::Trigger>(
+		"~/recover");
+	ASSERT_TRUE(setWarningClient->wait_for_service(1s));
+	ASSERT_TRUE(setErrorClient->wait_for_service(1s));
+	ASSERT_TRUE(recoverClient->wait_for_service(1s));
+
+	auto warningFuture = setWarningClient->async_send_request(
+		std::make_shared<std_srvs::srv::Trigger::Request>());
+	ASSERT_EQ(warningFuture.wait_for(1s), std::future_status::ready);
+	ASSERT_TRUE(warningFuture.get()->success);
+	EXPECT_TRUE(waitForState(yds_interfaces::msg::ComponentStatus::STATE_WARNING));
+
+	auto errorFuture = setErrorClient->async_send_request(
+		std::make_shared<std_srvs::srv::Trigger::Request>());
+	ASSERT_EQ(errorFuture.wait_for(1s), std::future_status::ready);
+	ASSERT_TRUE(errorFuture.get()->success);
+	EXPECT_TRUE(waitForState(yds_interfaces::msg::ComponentStatus::STATE_ERROR));
+
+	auto recoverFuture = recoverClient->async_send_request(
+		std::make_shared<std_srvs::srv::Trigger::Request>());
+	ASSERT_EQ(recoverFuture.wait_for(1s), std::future_status::ready);
+	ASSERT_TRUE(recoverFuture.get()->success);
+	EXPECT_TRUE(waitForState(yds_interfaces::msg::ComponentStatus::STATE_RUNNING));
 	executorRunner.stop();
 
 	std::lock_guard<std::mutex> lock(receivedMutex);

@@ -5,6 +5,7 @@
 #include <string>
 
 #include <QString>
+#include <QByteArray>
 
 #include <rcl_interfaces/msg/integer_range.hpp>
 #include <rcl_interfaces/msg/parameter_descriptor.hpp>
@@ -51,9 +52,13 @@ SampleProcessorNode::SampleProcessorNode(const rclcpp::NodeOptions& options)
 		  1000,
 		  intervalDescriptor("Sample processing interval in milliseconds."))),
 	  processedCount_(0),
+	  testState_(yds::ros2::ComponentState::kRunning),
 	  ready_(false),
 	  statusPublisher_(),
-	  processingTimer_() {
+	  processingTimer_(),
+	  setWarningService_(),
+	  setErrorService_(),
+	  recoverService_() {
 	validateInterval("processing_interval_ms", processingIntervalMs_);
 
 	const QString componentId = QString::fromStdString(declare_parameter<std::string>(
@@ -81,6 +86,39 @@ SampleProcessorNode::SampleProcessorNode(const rclcpp::NodeOptions& options)
 		[this]() {
 			process();
 		});
+	setWarningService_ = create_service<std_srvs::srv::Trigger>(
+		"~/set_warning",
+		[this](
+			const std_srvs::srv::Trigger::Request::SharedPtr,
+			std_srvs::srv::Trigger::Response::SharedPtr response) {
+			setTestState(
+				yds::ros2::ComponentState::kWarning,
+				1001,
+				QStringLiteral("Test warning requested"),
+				*response);
+		});
+	setErrorService_ = create_service<std_srvs::srv::Trigger>(
+		"~/set_error",
+		[this](
+			const std_srvs::srv::Trigger::Request::SharedPtr,
+			std_srvs::srv::Trigger::Response::SharedPtr response) {
+			setTestState(
+				yds::ros2::ComponentState::kError,
+				2001,
+				QStringLiteral("Test error requested"),
+				*response);
+		});
+	recoverService_ = create_service<std_srvs::srv::Trigger>(
+		"~/recover",
+		[this](
+			const std_srvs::srv::Trigger::Request::SharedPtr,
+			std_srvs::srv::Trigger::Response::SharedPtr response) {
+			setTestState(
+				yds::ros2::ComponentState::kRunning,
+				0,
+				QStringLiteral("Test state recovered"),
+				*response);
+		});
 
 	RCLCPP_INFO(get_logger(), "Sample processor node started");
 }
@@ -94,7 +132,8 @@ std::uint64_t SampleProcessorNode::processedCount() const noexcept {
 }
 
 void SampleProcessorNode::process() noexcept {
-	if (!ready_) {
+	const yds::ros2::ComponentState testState = testState_.load();
+	if (!ready_ && testState == yds::ros2::ComponentState::kRunning) {
 		ready_ = true;
 		if (statusPublisher_->setStatus(
 			yds::ros2::ComponentState::kReady,
@@ -102,6 +141,21 @@ void SampleProcessorNode::process() noexcept {
 			QStringLiteral("Initialization completed"))) {
 			RCLCPP_INFO(get_logger(), "Sample processor initialization completed");
 		}
+		return;
+	}
+
+	if (testState == yds::ros2::ComponentState::kWarning) {
+		statusPublisher_->setStatus(
+			testState,
+			1001,
+			QStringLiteral("Test warning requested"));
+		return;
+	}
+	if (testState == yds::ros2::ComponentState::kError) {
+		statusPublisher_->setStatus(
+			testState,
+			2001,
+			QStringLiteral("Test error requested"));
 		return;
 	}
 
@@ -114,6 +168,26 @@ void SampleProcessorNode::process() noexcept {
 		get_logger(),
 		"Sample processing completed: count=%lu",
 		static_cast<unsigned long>(processedCount_.load()));
+}
+
+void SampleProcessorNode::setTestState(
+	yds::ros2::ComponentState state,
+	qint32 errorCode,
+	const QString& message,
+	std_srvs::srv::Trigger::Response& response) noexcept {
+	testState_.store(state);
+	response.success = statusPublisher_->setStatus(state, errorCode, message);
+	response.message = response.success
+		? "Component test state updated"
+		: "Failed to publish component test state";
+	if (response.success) {
+		const QByteArray stateTextUtf8 = yds::ros2::componentStateText(state).toUtf8();
+		RCLCPP_INFO(
+			get_logger(),
+			"Component test state changed: state=%s, error_code=%ld",
+			stateTextUtf8.constData(),
+			static_cast<long>(errorCode));
+	}
 }
 
 }  // namespace sampleprocessor

@@ -5,6 +5,7 @@
 #include <memory>
 
 #include <rclcpp/rclcpp.hpp>
+#include <std_srvs/srv/trigger.hpp>
 
 #include <yds/ros2/component_status_publisher.h>
 
@@ -36,12 +37,21 @@ public:
 
 private:
 	void process() noexcept;
+	void setTestState(
+		yds::ros2::ComponentState state,
+		qint32 errorCode,
+		const QString& message,
+		std_srvs::srv::Trigger::Response& response) noexcept;
 
 	std::int64_t processingIntervalMs_;
 	std::atomic<std::uint64_t> processedCount_;
+	std::atomic<yds::ros2::ComponentState> testState_;
 	bool ready_;
 	std::unique_ptr<yds::ros2::ComponentStatusPublisher> statusPublisher_;
 	rclcpp::TimerBase::SharedPtr processingTimer_;
+	rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr setWarningService_;
+	rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr setErrorService_;
+	rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr recoverService_;
 };
 
 }  // namespace sampleprocessor
