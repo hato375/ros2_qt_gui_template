@@ -86,10 +86,10 @@ ComponentStatus componentStatusFromRos(
 	const yds_interfaces::msg::ComponentStatus& message) {
 	return {
 		topicName,
-		QString::fromStdString(message.component_id),
+		QString::fromUtf8(message.component_id.data(), static_cast<int>(message.component_id.size())),
 		componentStateFromRos(message.state),
 		static_cast<qint32>(message.error_code),
-		QString::fromStdString(message.message),
+		QString::fromUtf8(message.message.data(), static_cast<int>(message.message.size())),
 		dateTimeFromRos(message.header.stamp)};
 }
 
@@ -97,10 +97,10 @@ yds_interfaces::msg::ComponentStatus componentStatusToRos(
 	const ComponentStatus& status) {
 	yds_interfaces::msg::ComponentStatus message;
 	message.header.stamp = dateTimeToRos(status.timestamp);
-	message.component_id = status.componentId.toStdString();
+	message.component_id = status.componentId.toUtf8().toStdString();
 	message.state = componentStateToRos(status.state);
 	message.error_code = static_cast<std::int32_t>(status.errorCode);
-	message.message = status.message.toStdString();
+	message.message = status.message.toUtf8().toStdString();
 	return message;
 }
 

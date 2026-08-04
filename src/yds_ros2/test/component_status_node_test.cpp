@@ -110,7 +110,7 @@ TEST(ComponentStatusNodeTest, PublishesUpdatedStatusAndPeriodicHeartbeat) {
 	EXPECT_TRUE(node->setComponentStatus(
 		yds::ros2::ComponentState::kRunning,
 		12,
-		QStringLiteral("Processing")));
+		QStringLiteral("画像を処理しています")));
 	const auto deadline = std::chrono::steady_clock::now() + 2s;
 	while (std::chrono::steady_clock::now() < deadline) {
 		{
@@ -129,7 +129,7 @@ TEST(ComponentStatusNodeTest, PublishesUpdatedStatusAndPeriodicHeartbeat) {
 	EXPECT_EQ(latestMessage.component_id, "camera-1");
 	EXPECT_EQ(latestMessage.state, yds_interfaces::msg::ComponentStatus::STATE_RUNNING);
 	EXPECT_EQ(latestMessage.error_code, 12);
-	EXPECT_EQ(latestMessage.message, "Processing");
+	EXPECT_EQ(latestMessage.message, std::string(u8"画像を処理しています"));
 	EXPECT_NE(latestMessage.header.stamp.sec, 0);
 }
 

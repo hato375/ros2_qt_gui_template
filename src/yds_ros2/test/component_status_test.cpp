@@ -96,10 +96,10 @@ TEST(ComponentStatusConversionTest, ConvertsComponentStatusInBothDirections) {
 		QDateTime::fromMSecsSinceEpoch(1735689600123, Qt::UTC).toLocalTime();
 	const yds::ros2::ComponentStatus status{
 		QStringLiteral("camera/status"),
-		QStringLiteral("camera-1"),
+		QStringLiteral("カメラ-1"),
 		yds::ros2::ComponentState::kError,
 		1001,
-		QStringLiteral("connection failed"),
+		QStringLiteral("カメラとの接続に失敗しました"),
 		timestamp};
 
 	const auto rosMessage = yds::ros2::componentStatusToRos(status);
@@ -111,6 +111,8 @@ TEST(ComponentStatusConversionTest, ConvertsComponentStatusInBothDirections) {
 	EXPECT_EQ(convertedStatus.state, status.state);
 	EXPECT_EQ(convertedStatus.errorCode, status.errorCode);
 	EXPECT_EQ(convertedStatus.message, status.message);
+	EXPECT_EQ(rosMessage.component_id, std::string(u8"カメラ-1"));
+	EXPECT_EQ(rosMessage.message, std::string(u8"カメラとの接続に失敗しました"));
 	EXPECT_EQ(
 		convertedStatus.timestamp.toMSecsSinceEpoch(),
 		status.timestamp.toMSecsSinceEpoch());
