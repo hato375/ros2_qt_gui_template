@@ -14,7 +14,7 @@
 #include <rcl_interfaces/msg/integer_range.hpp>
 #include <rcl_interfaces/msg/parameter_descriptor.hpp>
 
-#include <yds/ros2/equipment_status_conversion.h>
+#include <yds/ros2/component_status_conversion.h>
 
 namespace ros2qtgui {
 
@@ -71,7 +71,7 @@ void validateMonitorName(const std::string& monitorName) {
 	static const std::regex validNamePattern("^[A-Za-z_][A-Za-z0-9_]*$");
 	if (!std::regex_match(monitorName, validNamePattern)) {
 		throw std::invalid_argument(
-			"topic monitor names must start with a letter or underscore and contain only "
+			"component monitor names must start with a letter or underscore and contain only "
 			"letters, numbers, and underscores: " +
 			monitorName);
 	}
@@ -89,13 +89,13 @@ RosNode::RosNode(
 	HeartbeatCallback heartbeatCallback,
 	ApplicationEventCallback applicationEventCallback,
 	TopicReceptionStatusCallback topicReceptionStatusCallback,
-	EquipmentStatusCallback equipmentStatusCallback,
+	ComponentStatusCallback componentStatusCallback,
 	const rclcpp::NodeOptions& options)
 	: Node("ros2_qt_gui_node", options),
 	  heartbeatCallback_(std::move(heartbeatCallback)),
 	  applicationEventCallback_(std::move(applicationEventCallback)),
 	  topicReceptionStatusCallback_(std::move(topicReceptionStatusCallback)),
-	  equipmentStatusCallback_(std::move(equipmentStatusCallback)),
+	  componentStatusCallback_(std::move(componentStatusCallback)),
 	  heartbeatIntervalMs_(declare_parameter<std::int64_t>(
 		  "heartbeat_interval_ms",
 		  kDefaultHeartbeatIntervalMs,
@@ -110,18 +110,18 @@ RosNode::RosNode(
 			  "GUI status check interval in milliseconds.",
 			  kMinimumGuiStatusCheckIntervalMs,
 			  kMaximumGuiStatusCheckIntervalMs))),
-	  topicMonitorNames_(declare_parameter<std::vector<std::string>>(
-		  "topic_monitor_names",
+	  componentMonitorNames_(declare_parameter<std::vector<std::string>>(
+		  "component_monitor_names",
 		  std::vector<std::string>{
 			  kDefaultCameraMonitorName,
 			  kDefaultPlcMonitorName,
 		  },
-		  makeReadOnlyDescriptor("Names of topic monitor configurations."))),
-	  topicMonitorConfigurations_(),
+		  makeReadOnlyDescriptor("Names of component monitor configurations."))),
+	  componentMonitorConfigurations_(),
 	  topicReceptionMonitors_(),
-	  latestEquipmentStatuses_(),
-	  hasEquipmentStatuses_(),
-	  equipmentStatusDirty_(),
+	  latestComponentStatuses_(),
+	  hasComponentStatuses_(),
+	  componentStatusDirty_(),
 	  heartbeatCount_(0),
 	  heartbeatTimer_(),
 	  monitoredTopicSubscriptions_(),
@@ -136,26 +136,26 @@ RosNode::RosNode(
 		guiStatusCheckIntervalMs_,
 		kMinimumGuiStatusCheckIntervalMs,
 		kMaximumGuiStatusCheckIntervalMs);
-	if (topicMonitorNames_.empty()) {
-		throw std::invalid_argument("topic_monitor_names must not be empty");
+	if (componentMonitorNames_.empty()) {
+		throw std::invalid_argument("component_monitor_names must not be empty");
 	}
 	std::set<std::string> uniqueMonitorNames;
 	std::set<std::string> uniqueTopicNames;
-	for (const auto& monitorName : topicMonitorNames_) {
+	for (const auto& monitorName : componentMonitorNames_) {
 		validateMonitorName(monitorName);
 		if (!uniqueMonitorNames.insert(monitorName).second) {
-			throw std::invalid_argument("topic_monitor_names must not contain duplicates");
+			throw std::invalid_argument("component_monitor_names must not contain duplicates");
 		}
 
-		const std::string parameterPrefix = "topic_monitors." + monitorName;
+		const std::string parameterPrefix = "component_monitors." + monitorName;
 		const bool enabled = declare_parameter<bool>(
 			parameterPrefix + ".enabled",
 			true,
-			makeReadOnlyDescriptor("Whether this topic monitor is enabled."));
+			makeReadOnlyDescriptor("Whether this component monitor is enabled."));
 		const std::string topicName = declare_parameter<std::string>(
-			parameterPrefix + ".topic_name",
+			parameterPrefix + ".status_topic",
 			monitorName + "/status",
-			makeReadOnlyDescriptor("yds_interfaces/EquipmentStatus topic name."));
+			makeReadOnlyDescriptor("yds_interfaces/ComponentStatus topic name."));
 		const std::int64_t timeoutMs = declare_parameter<std::int64_t>(
 			parameterPrefix + ".timeout_ms",
 			defaultTimeoutMs(monitorName),
@@ -165,10 +165,10 @@ RosNode::RosNode(
 				kMaximumTopicReceptionTimeoutMs));
 
 		if (topicName.empty()) {
-			throw std::invalid_argument(parameterPrefix + ".topic_name must not be empty");
+			throw std::invalid_argument(parameterPrefix + ".status_topic must not be empty");
 		}
 		if (!uniqueTopicNames.insert(topicName).second) {
-			throw std::invalid_argument("topic monitor topic names must not contain duplicates");
+			throw std::invalid_argument("component monitor status topics must not contain duplicates");
 		}
 		validateInterval(
 			parameterPrefix + ".timeout_ms",
@@ -176,44 +176,44 @@ RosNode::RosNode(
 			kMinimumTopicReceptionTimeoutMs,
 			kMaximumTopicReceptionTimeoutMs);
 		if (enabled) {
-			topicMonitorConfigurations_.push_back({
+			componentMonitorConfigurations_.push_back({
 				QString::fromStdString(monitorName),
 				QString::fromStdString(topicName),
 				timeoutMs});
 		}
 	}
-	if (topicMonitorConfigurations_.empty()) {
-		throw std::invalid_argument("at least one topic monitor must be enabled");
+	if (componentMonitorConfigurations_.empty()) {
+		throw std::invalid_argument("at least one component monitor must be enabled");
 	}
 
 	heartbeatTimer_ = create_wall_timer(std::chrono::milliseconds(heartbeatIntervalMs_), [this]() {
 		onHeartbeat();
 	});
-	topicReceptionMonitors_.reserve(topicMonitorConfigurations_.size());
-	latestEquipmentStatuses_.reserve(topicMonitorConfigurations_.size());
-	hasEquipmentStatuses_.reserve(topicMonitorConfigurations_.size());
-	equipmentStatusDirty_.reserve(topicMonitorConfigurations_.size());
-	monitoredTopicSubscriptions_.reserve(topicMonitorConfigurations_.size());
-	for (std::size_t index = 0; index < topicMonitorConfigurations_.size(); ++index) {
-		const auto& configuration = topicMonitorConfigurations_[index];
+	topicReceptionMonitors_.reserve(componentMonitorConfigurations_.size());
+	latestComponentStatuses_.reserve(componentMonitorConfigurations_.size());
+	hasComponentStatuses_.reserve(componentMonitorConfigurations_.size());
+	componentStatusDirty_.reserve(componentMonitorConfigurations_.size());
+	monitoredTopicSubscriptions_.reserve(componentMonitorConfigurations_.size());
+	for (std::size_t index = 0; index < componentMonitorConfigurations_.size(); ++index) {
+		const auto& configuration = componentMonitorConfigurations_[index];
 		topicReceptionMonitors_.push_back(
 			std::make_unique<yds::ros2::TopicReceptionMonitor>(
-				configuration.topicName,
+				configuration.statusTopicName,
 				std::chrono::milliseconds(configuration.timeoutMs)));
-		latestEquipmentStatuses_.push_back({
-			configuration.topicName,
+		latestComponentStatuses_.push_back({
+			configuration.statusTopicName,
 			QString(),
-			yds::ros2::EquipmentState::kUnknown,
+			yds::ros2::ComponentState::kUnknown,
 			0,
 			QString(),
 			QDateTime()});
-		hasEquipmentStatuses_.push_back(false);
-		equipmentStatusDirty_.push_back(false);
+		hasComponentStatuses_.push_back(false);
+		componentStatusDirty_.push_back(false);
 		monitoredTopicSubscriptions_.push_back(
-			create_subscription<yds_interfaces::msg::EquipmentStatus>(
-			configuration.topicName.toStdString(),
+			create_subscription<yds_interfaces::msg::ComponentStatus>(
+			configuration.statusTopicName.toStdString(),
 			rclcpp::QoS(10),
-			[this, index](const yds_interfaces::msg::EquipmentStatus::SharedPtr message) {
+			[this, index](const yds_interfaces::msg::ComponentStatus::SharedPtr message) {
 				onMonitoredTopic(index, message);
 			}));
 	}
@@ -225,16 +225,16 @@ RosNode::RosNode(
 	RCLCPP_INFO(
 		get_logger(),
 		"Configuration: heartbeat_interval_ms=%ld, gui_status_check_interval_ms=%ld, "
-		"enabled_topic_monitor_count=%lu",
+		"enabled_component_monitor_count=%lu",
 		static_cast<long>(heartbeatIntervalMs_),
 		static_cast<long>(guiStatusCheckIntervalMs_),
-		static_cast<unsigned long>(topicMonitorConfigurations_.size()));
-	for (const auto& configuration : topicMonitorConfigurations_) {
+		static_cast<unsigned long>(componentMonitorConfigurations_.size()));
+	for (const auto& configuration : componentMonitorConfigurations_) {
 		const QByteArray monitorNameUtf8 = configuration.name.toUtf8();
-		const QByteArray topicNameUtf8 = configuration.topicName.toUtf8();
+		const QByteArray topicNameUtf8 = configuration.statusTopicName.toUtf8();
 		RCLCPP_INFO(
 			get_logger(),
-			"Topic monitor enabled: name=%s, topic=%s, timeout_ms=%ld",
+			"Component monitor enabled: name=%s, topic=%s, timeout_ms=%ld",
 			monitorNameUtf8.constData(),
 			topicNameUtf8.constData(),
 			static_cast<long>(configuration.timeoutMs));
@@ -250,9 +250,9 @@ std::int64_t RosNode::guiStatusCheckIntervalMs() const noexcept {
 	return guiStatusCheckIntervalMs_;
 }
 
-const std::vector<TopicMonitorConfiguration>& RosNode::topicMonitorConfigurations()
+const std::vector<ComponentMonitorConfiguration>& RosNode::componentMonitorConfigurations()
 	const noexcept {
-	return topicMonitorConfigurations_;
+	return componentMonitorConfigurations_;
 }
 
 void RosNode::onHeartbeat() noexcept {
@@ -276,23 +276,23 @@ void RosNode::onHeartbeat() noexcept {
 
 void RosNode::onMonitoredTopic(
 	std::size_t monitorIndex,
-	const yds_interfaces::msg::EquipmentStatus::SharedPtr message) noexcept {
+	const yds_interfaces::msg::ComponentStatus::SharedPtr message) noexcept {
 	try {
 		auto& monitor = *topicReceptionMonitors_.at(monitorIndex);
-		const auto previousStatus = latestEquipmentStatuses_.at(monitorIndex);
-		const bool hasPreviousStatus = hasEquipmentStatuses_.at(monitorIndex);
+		const auto previousStatus = latestComponentStatuses_.at(monitorIndex);
+		const bool hasPreviousStatus = hasComponentStatuses_.at(monitorIndex);
 		auto status =
-			yds::ros2::equipmentStatusFromRos(monitor.status().topicName, *message);
+			yds::ros2::componentStatusFromRos(monitor.status().topicName, *message);
 		if (!status.timestamp.isValid()) {
 			status.timestamp = QDateTime::currentDateTime();
 		}
-		latestEquipmentStatuses_.at(monitorIndex) = status;
-		hasEquipmentStatuses_.at(monitorIndex) = true;
-		equipmentStatusDirty_.at(monitorIndex) = true;
+		latestComponentStatuses_.at(monitorIndex) = status;
+		hasComponentStatuses_.at(monitorIndex) = true;
+		componentStatusDirty_.at(monitorIndex) = true;
 		handleTopicReceptionTransition(
 			monitor.status().topicName,
 			monitor.recordReception(status.message));
-		handleEquipmentStateTransition(previousStatus, status, hasPreviousStatus);
+		handleComponentStateTransition(previousStatus, status, hasPreviousStatus);
 	} catch (const std::exception& exception) {
 		RCLCPP_ERROR(
 			get_logger(),
@@ -317,7 +317,7 @@ void RosNode::updateTopicReceptionStatus() noexcept {
 			monitor->status().topicName,
 			monitor->checkTimeout());
 		notifyTopicReceptionStatus(*monitor);
-		notifyEquipmentStatus(index);
+		notifyComponentStatus(index);
 	}
 }
 
@@ -345,9 +345,9 @@ void RosNode::notifyTopicReceptionStatus(
 	}
 }
 
-void RosNode::handleEquipmentStateTransition(
-	const yds::ros2::EquipmentStatus& previousStatus,
-	const yds::ros2::EquipmentStatus& currentStatus,
+void RosNode::handleComponentStateTransition(
+	const yds::ros2::ComponentStatus& previousStatus,
+	const yds::ros2::ComponentStatus& currentStatus,
 	bool hasPreviousStatus) noexcept {
 	if (hasPreviousStatus &&
 		previousStatus.state == currentStatus.state &&
@@ -357,30 +357,30 @@ void RosNode::handleEquipmentStateTransition(
 
 	yds::ros2::ApplicationEventLevel level = yds::ros2::ApplicationEventLevel::kInfo;
 	switch (currentStatus.state) {
-	case yds::ros2::EquipmentState::kWarning:
+	case yds::ros2::ComponentState::kWarning:
 		level = yds::ros2::ApplicationEventLevel::kWarning;
 		break;
-	case yds::ros2::EquipmentState::kError:
+	case yds::ros2::ComponentState::kError:
 		level = yds::ros2::ApplicationEventLevel::kError;
 		break;
-	case yds::ros2::EquipmentState::kCritical:
+	case yds::ros2::ComponentState::kCritical:
 		level = yds::ros2::ApplicationEventLevel::kCritical;
 		break;
-	case yds::ros2::EquipmentState::kUnknown:
-	case yds::ros2::EquipmentState::kInitializing:
-	case yds::ros2::EquipmentState::kReady:
-	case yds::ros2::EquipmentState::kRunning:
-	case yds::ros2::EquipmentState::kStopped:
+	case yds::ros2::ComponentState::kUnknown:
+	case yds::ros2::ComponentState::kInitializing:
+	case yds::ros2::ComponentState::kReady:
+	case yds::ros2::ComponentState::kRunning:
+	case yds::ros2::ComponentState::kStopped:
 		break;
 	}
 
 	const QString eventMessage =
-		QStringLiteral("Equipment state changed: topic=%1, equipment_id=%2, state=%3, "
+		QStringLiteral("Component state changed: topic=%1, component_id=%2, state=%3, "
 			"error_code=%4, message=%5")
 			.arg(
 				currentStatus.topicName,
-				currentStatus.equipmentId,
-				yds::ros2::equipmentStateText(currentStatus.state))
+				currentStatus.componentId,
+				yds::ros2::componentStateText(currentStatus.state))
 			.arg(currentStatus.errorCode)
 			.arg(currentStatus.message);
 	const QByteArray eventMessageUtf8 = eventMessage.toUtf8();
@@ -401,23 +401,23 @@ void RosNode::handleEquipmentStateTransition(
 	reportApplicationEvent(level, eventMessage);
 }
 
-void RosNode::notifyEquipmentStatus(std::size_t monitorIndex) noexcept {
-	if (!equipmentStatusCallback_ || !equipmentStatusDirty_.at(monitorIndex)) {
+void RosNode::notifyComponentStatus(std::size_t monitorIndex) noexcept {
+	if (!componentStatusCallback_ || !componentStatusDirty_.at(monitorIndex)) {
 		return;
 	}
 
 	try {
-		equipmentStatusCallback_(latestEquipmentStatuses_.at(monitorIndex));
-		equipmentStatusDirty_.at(monitorIndex) = false;
+		componentStatusCallback_(latestComponentStatuses_.at(monitorIndex));
+		componentStatusDirty_.at(monitorIndex) = false;
 	} catch (const std::exception& exception) {
 		RCLCPP_ERROR(
 			get_logger(),
-			"Equipment status callback failed: %s",
+			"Component status callback failed: %s",
 			exception.what());
 	} catch (...) {
 		RCLCPP_ERROR(
 			get_logger(),
-			"Equipment status callback failed with an unknown error");
+			"Component status callback failed with an unknown error");
 	}
 }
 

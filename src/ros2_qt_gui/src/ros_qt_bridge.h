@@ -5,7 +5,7 @@
 #include <QObject>
 
 #include <yds/ros2/application_event.h>
-#include <yds/ros2/equipment_status.h>
+#include <yds/ros2/component_status.h>
 #include <yds/ros2/topic_reception_status.h>
 
 namespace ros2qtgui {
@@ -32,9 +32,9 @@ public:
 	void notifyTopicReceptionStatus(
 		const yds::ros2::TopicReceptionStatus& status) noexcept;
 
-	/// @brief 設備状態を通知する
-	/// @param status 通知する設備状態
-	void notifyEquipmentStatus(const yds::ros2::EquipmentStatus& status) noexcept;
+	/// @brief コンポーネント状態を通知する
+	/// @param status 通知するコンポーネント状態
+	void notifyComponentStatus(const yds::ros2::ComponentStatus& status) noexcept;
 
 signals:
 	/// @brief ハートビートが更新されたときに送出される
@@ -49,9 +49,9 @@ signals:
 	/// @param status 更新された受信状況
 	void topicReceptionStatusUpdated(const yds::ros2::TopicReceptionStatus& status);
 
-	/// @brief 設備状態が更新されたときに送出される
-	/// @param status 更新された設備状態
-	void equipmentStatusUpdated(const yds::ros2::EquipmentStatus& status);
+	/// @brief コンポーネント状態が更新されたときに送出される
+	/// @param status 更新されたコンポーネント状態
+	void componentStatusUpdated(const yds::ros2::ComponentStatus& status);
 };
 
 }  // namespace ros2qtgui

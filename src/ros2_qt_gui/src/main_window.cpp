@@ -19,9 +19,9 @@ namespace {
 
 constexpr int kMaximumEventLogEntries = 500;
 constexpr int kTopicColumn = 0;
-constexpr int kEquipmentIdColumn = 1;
+constexpr int kComponentIdColumn = 1;
 constexpr int kReceptionStateColumn = 2;
-constexpr int kEquipmentStateColumn = 3;
+constexpr int kComponentStateColumn = 3;
 constexpr int kErrorCodeColumn = 4;
 constexpr int kLastReceivedAtColumn = 5;
 constexpr int kReceivedCountColumn = 6;
@@ -46,34 +46,34 @@ void applyReceptionStateStyle(
 	}
 }
 
-void applyEquipmentStateStyle(
+void applyComponentStateStyle(
 	QTableWidgetItem* item,
-	yds::ros2::EquipmentState state) noexcept {
+	yds::ros2::ComponentState state) noexcept {
 	item->setForeground(QColor(QStringLiteral("#000000")));
 	switch (state) {
-	case yds::ros2::EquipmentState::kUnknown:
+	case yds::ros2::ComponentState::kUnknown:
 		item->setBackground(QColor(QStringLiteral("#E0E0E0")));
 		return;
-	case yds::ros2::EquipmentState::kInitializing:
+	case yds::ros2::ComponentState::kInitializing:
 		item->setBackground(QColor(QStringLiteral("#BBDEFB")));
 		return;
-	case yds::ros2::EquipmentState::kReady:
+	case yds::ros2::ComponentState::kReady:
 		item->setBackground(QColor(QStringLiteral("#DCEDC8")));
 		return;
-	case yds::ros2::EquipmentState::kRunning:
+	case yds::ros2::ComponentState::kRunning:
 		item->setBackground(QColor(QStringLiteral("#C8E6C9")));
 		return;
-	case yds::ros2::EquipmentState::kWarning:
+	case yds::ros2::ComponentState::kWarning:
 		item->setBackground(QColor(QStringLiteral("#FFE082")));
 		return;
-	case yds::ros2::EquipmentState::kError:
+	case yds::ros2::ComponentState::kError:
 		item->setBackground(QColor(QStringLiteral("#EF9A9A")));
 		return;
-	case yds::ros2::EquipmentState::kCritical:
+	case yds::ros2::ComponentState::kCritical:
 		item->setBackground(QColor(QStringLiteral("#B71C1C")));
 		item->setForeground(QColor(QStringLiteral("#FFFFFF")));
 		return;
-	case yds::ros2::EquipmentState::kStopped:
+	case yds::ros2::ComponentState::kStopped:
 		item->setBackground(QColor(QStringLiteral("#CFD8DC")));
 		return;
 	}
@@ -95,14 +95,14 @@ MainWindow::MainWindow(int statusCheckIntervalMs)
 	layout->addWidget(new QLabel(tr("ROS 2 and Qt are connected."), centralWidget));
 	layout->addWidget(statusLabel_);
 	layout->addWidget(heartbeatLabel_);
-	layout->addWidget(new QLabel(tr("Monitored topics"), centralWidget));
+	layout->addWidget(new QLabel(tr("Monitored components"), centralWidget));
 	topicStatusTable_->setObjectName(QStringLiteral("topicStatusTable"));
 	topicStatusTable_->setColumnCount(8);
 	topicStatusTable_->setHorizontalHeaderLabels({
 		tr("Topic"),
-		tr("Equipment ID"),
+		tr("Component ID"),
 		tr("Communication"),
-		tr("Equipment state"),
+		tr("Component state"),
 		tr("Error code"),
 		tr("Last received at"),
 		tr("Count"),
@@ -151,13 +151,13 @@ void MainWindow::setTopicReceptionStatus(
 		QString::number(status.receivedCount));
 }
 
-void MainWindow::setEquipmentStatus(
-	const yds::ros2::EquipmentStatus& status) noexcept {
+void MainWindow::setComponentStatus(
+	const yds::ros2::ComponentStatus& status) noexcept {
 	const int targetRow = findOrCreateTopicRow(status.topicName);
-	topicStatusTable_->item(targetRow, kEquipmentIdColumn)->setText(status.equipmentId);
-	auto* equipmentStateItem = topicStatusTable_->item(targetRow, kEquipmentStateColumn);
-	equipmentStateItem->setText(yds::ros2::equipmentStateText(status.state));
-	applyEquipmentStateStyle(equipmentStateItem, status.state);
+	topicStatusTable_->item(targetRow, kComponentIdColumn)->setText(status.componentId);
+	auto* componentStateItem = topicStatusTable_->item(targetRow, kComponentStateColumn);
+	componentStateItem->setText(yds::ros2::componentStateText(status.state));
+	applyComponentStateStyle(componentStateItem, status.state);
 	topicStatusTable_->item(targetRow, kErrorCodeColumn)->setText(
 		QString::number(status.errorCode));
 	topicStatusTable_->item(targetRow, kMessageColumn)->setText(status.message);
@@ -183,10 +183,10 @@ int MainWindow::findOrCreateTopicRow(const QString& topicName) noexcept {
 	applyReceptionStateStyle(
 		receptionStateItem,
 		yds::ros2::TopicReceptionState::kWaiting);
-	auto* equipmentStateItem = topicStatusTable_->item(targetRow, kEquipmentStateColumn);
-	equipmentStateItem->setText(
-		yds::ros2::equipmentStateText(yds::ros2::EquipmentState::kUnknown));
-	applyEquipmentStateStyle(equipmentStateItem, yds::ros2::EquipmentState::kUnknown);
+	auto* componentStateItem = topicStatusTable_->item(targetRow, kComponentStateColumn);
+	componentStateItem->setText(
+		yds::ros2::componentStateText(yds::ros2::ComponentState::kUnknown));
+	applyComponentStateStyle(componentStateItem, yds::ros2::ComponentState::kUnknown);
 	topicStatusTable_->item(targetRow, kErrorCodeColumn)->setText(QStringLiteral("0"));
 	return targetRow;
 }

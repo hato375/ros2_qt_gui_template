@@ -9,7 +9,7 @@ uint8 STATE_ERROR=5
 uint8 STATE_CRITICAL=6
 uint8 STATE_STOPPED=7
 
-string equipment_id
+string component_id
 uint8 state
 int32 error_code
 string message

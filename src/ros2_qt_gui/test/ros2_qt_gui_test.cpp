@@ -17,7 +17,7 @@
 
 #include <gtest/gtest.h>
 #include <rclcpp/rclcpp.hpp>
-#include <yds_interfaces/msg/equipment_status.hpp>
+#include <yds_interfaces/msg/component_status.hpp>
 
 #include <yds/ros2/executor_runner.h>
 
@@ -144,22 +144,22 @@ private:
 	const QThread* receiverThread_;
 };
 
-class EquipmentStatusReceiver final : public QObject {
+class ComponentStatusReceiver final : public QObject {
 public:
-	explicit EquipmentStatusReceiver(QObject* parent = nullptr)
+	explicit ComponentStatusReceiver(QObject* parent = nullptr)
 		: QObject(parent),
 		  receivedCount_(0),
 		  lastStatus_({
 			  QString(),
 			  QString(),
-			  yds::ros2::EquipmentState::kUnknown,
+			  yds::ros2::ComponentState::kUnknown,
 			  0,
 			  QString(),
 			  QDateTime()}),
 		  receiverThread_(nullptr) {
 	}
 
-	void receiveEquipmentStatus(const yds::ros2::EquipmentStatus& status) {
+	void receiveComponentStatus(const yds::ros2::ComponentStatus& status) {
 		++receivedCount_;
 		lastStatus_ = status;
 		statuses_.insert(status.topicName, status);
@@ -170,7 +170,7 @@ public:
 		return receivedCount_;
 	}
 
-	const yds::ros2::EquipmentStatus& lastStatus() const noexcept {
+	const yds::ros2::ComponentStatus& lastStatus() const noexcept {
 		return lastStatus_;
 	}
 
@@ -178,7 +178,7 @@ public:
 		return statuses_.contains(topicName);
 	}
 
-	yds::ros2::EquipmentStatus status(const QString& topicName) const {
+	yds::ros2::ComponentStatus status(const QString& topicName) const {
 		return statuses_.value(topicName);
 	}
 
@@ -188,8 +188,8 @@ public:
 
 private:
 	int receivedCount_;
-	yds::ros2::EquipmentStatus lastStatus_;
-	QHash<QString, yds::ros2::EquipmentStatus> statuses_;
+	yds::ros2::ComponentStatus lastStatus_;
+	QHash<QString, yds::ros2::ComponentStatus> statuses_;
 	const QThread* receiverThread_;
 };
 
@@ -286,22 +286,22 @@ TEST(RosQtBridgeTest, DeliversTopicReceptionStatusOnQtThread) {
 	EXPECT_EQ(receiver.receiverThread(), QThread::currentThread());
 }
 
-TEST(RosQtBridgeTest, DeliversEquipmentStatusOnQtThread) {
+TEST(RosQtBridgeTest, DeliversComponentStatusOnQtThread) {
 	ros2qtgui::RosQtBridge bridge;
-	EquipmentStatusReceiver receiver;
+	ComponentStatusReceiver receiver;
 	QObject::connect(
 		&bridge,
-		&ros2qtgui::RosQtBridge::equipmentStatusUpdated,
+		&ros2qtgui::RosQtBridge::componentStatusUpdated,
 		&receiver,
-		&EquipmentStatusReceiver::receiveEquipmentStatus,
+		&ComponentStatusReceiver::receiveComponentStatus,
 		Qt::QueuedConnection);
 
 	const QDateTime timestamp = QDateTime::currentDateTime();
 	std::thread notifier([&bridge, timestamp]() {
-		bridge.notifyEquipmentStatus({
+		bridge.notifyComponentStatus({
 			QStringLiteral("camera/status"),
 			QStringLiteral("camera-1"),
-			yds::ros2::EquipmentState::kRunning,
+			yds::ros2::ComponentState::kRunning,
 			0,
 			QStringLiteral("capturing"),
 			timestamp});
@@ -311,8 +311,8 @@ TEST(RosQtBridgeTest, DeliversEquipmentStatusOnQtThread) {
 	ASSERT_TRUE(waitFor([&receiver]() {
 		return receiver.receivedCount() == 1;
 	}, 1000));
-	EXPECT_EQ(receiver.lastStatus().equipmentId, QStringLiteral("camera-1"));
-	EXPECT_EQ(receiver.lastStatus().state, yds::ros2::EquipmentState::kRunning);
+	EXPECT_EQ(receiver.lastStatus().componentId, QStringLiteral("camera-1"));
+	EXPECT_EQ(receiver.lastStatus().state, yds::ros2::ComponentState::kRunning);
 	EXPECT_EQ(receiver.lastStatus().message, QStringLiteral("capturing"));
 	EXPECT_EQ(receiver.receiverThread(), QThread::currentThread());
 }
@@ -353,17 +353,17 @@ TEST(MainWindowTest, DisplaysMultipleTopicStatuses) {
 		QDateTime::currentDateTime(),
 		1,
 		QStringLiteral("connected")});
-	mainWindow.setEquipmentStatus({
+	mainWindow.setComponentStatus({
 		QStringLiteral("camera/status"),
 		QStringLiteral("camera-1"),
-		yds::ros2::EquipmentState::kRunning,
+		yds::ros2::ComponentState::kRunning,
 		0,
 		QStringLiteral("capturing"),
 		QDateTime::currentDateTime()});
-	mainWindow.setEquipmentStatus({
+	mainWindow.setComponentStatus({
 		QStringLiteral("plc/status"),
 		QStringLiteral("plc-1"),
-		yds::ros2::EquipmentState::kError,
+		yds::ros2::ComponentState::kError,
 		1001,
 		QStringLiteral("connection failed"),
 		QDateTime::currentDateTime()});
@@ -395,21 +395,21 @@ TEST(MainWindowTest, DisplaysMultipleTopicStatuses) {
 		QColor(QStringLiteral("#EF9A9A")));
 }
 
-TEST(MainWindowTest, UsesColorsForEveryEquipmentState) {
+TEST(MainWindowTest, UsesColorsForEveryComponentState) {
 	struct StateColor {
-		yds::ros2::EquipmentState state;
+		yds::ros2::ComponentState state;
 		const char* backgroundColor;
 		const char* foregroundColor;
 	};
 	const StateColor stateColors[] = {
-		{yds::ros2::EquipmentState::kUnknown, "#E0E0E0", "#000000"},
-		{yds::ros2::EquipmentState::kInitializing, "#BBDEFB", "#000000"},
-		{yds::ros2::EquipmentState::kReady, "#DCEDC8", "#000000"},
-		{yds::ros2::EquipmentState::kRunning, "#C8E6C9", "#000000"},
-		{yds::ros2::EquipmentState::kWarning, "#FFE082", "#000000"},
-		{yds::ros2::EquipmentState::kError, "#EF9A9A", "#000000"},
-		{yds::ros2::EquipmentState::kCritical, "#B71C1C", "#FFFFFF"},
-		{yds::ros2::EquipmentState::kStopped, "#CFD8DC", "#000000"},
+		{yds::ros2::ComponentState::kUnknown, "#E0E0E0", "#000000"},
+		{yds::ros2::ComponentState::kInitializing, "#BBDEFB", "#000000"},
+		{yds::ros2::ComponentState::kReady, "#DCEDC8", "#000000"},
+		{yds::ros2::ComponentState::kRunning, "#C8E6C9", "#000000"},
+		{yds::ros2::ComponentState::kWarning, "#FFE082", "#000000"},
+		{yds::ros2::ComponentState::kError, "#EF9A9A", "#000000"},
+		{yds::ros2::ComponentState::kCritical, "#B71C1C", "#FFFFFF"},
+		{yds::ros2::ComponentState::kStopped, "#CFD8DC", "#000000"},
 	};
 
 	ros2qtgui::MainWindow mainWindow(200);
@@ -418,7 +418,7 @@ TEST(MainWindowTest, UsesColorsForEveryEquipmentState) {
 	ASSERT_NE(topicStatusTable, nullptr);
 
 	for (const auto& stateColor : stateColors) {
-		mainWindow.setEquipmentStatus({
+		mainWindow.setComponentStatus({
 			QStringLiteral("camera/status"),
 			QStringLiteral("camera-1"),
 			stateColor.state,
@@ -477,13 +477,13 @@ TEST(RosNodeParameterTest, UsesDefaultValues) {
 
 	EXPECT_EQ(node->heartbeatIntervalMs(), 1000);
 	EXPECT_EQ(node->guiStatusCheckIntervalMs(), 200);
-	const auto& configurations = node->topicMonitorConfigurations();
+	const auto& configurations = node->componentMonitorConfigurations();
 	ASSERT_EQ(configurations.size(), 2U);
 	EXPECT_EQ(configurations[0].name, QStringLiteral("camera"));
-	EXPECT_EQ(configurations[0].topicName, QStringLiteral("camera/status"));
+	EXPECT_EQ(configurations[0].statusTopicName, QStringLiteral("camera/status"));
 	EXPECT_EQ(configurations[0].timeoutMs, 3000);
 	EXPECT_EQ(configurations[1].name, QStringLiteral("plc"));
-	EXPECT_EQ(configurations[1].topicName, QStringLiteral("plc/status"));
+	EXPECT_EQ(configurations[1].statusTopicName, QStringLiteral("plc/status"));
 	EXPECT_EQ(configurations[1].timeoutMs, 5000);
 
 	const auto result = node->set_parameter(rclcpp::Parameter("heartbeat_interval_ms", 500));
@@ -496,27 +496,27 @@ TEST(RosNodeParameterTest, UsesOverrideValues) {
 		rclcpp::Parameter("heartbeat_interval_ms", 250),
 		rclcpp::Parameter("gui_status_check_interval_ms", 100),
 		rclcpp::Parameter(
-			"topic_monitor_names",
+			"component_monitor_names",
 			std::vector<std::string>{"camera", "robot"}),
-		rclcpp::Parameter("topic_monitors.camera.enabled", false),
-		rclcpp::Parameter("topic_monitors.robot.enabled", true),
-		rclcpp::Parameter("topic_monitors.robot.topic_name", "robot/health"),
-		rclcpp::Parameter("topic_monitors.robot.timeout_ms", 7000),
+		rclcpp::Parameter("component_monitors.camera.enabled", false),
+		rclcpp::Parameter("component_monitors.robot.enabled", true),
+		rclcpp::Parameter("component_monitors.robot.status_topic", "robot/health"),
+		rclcpp::Parameter("component_monitors.robot.timeout_ms", 7000),
 	});
 	auto node = std::make_shared<ros2qtgui::RosNode>(
 		[](std::uint64_t) {
 		},
 		ros2qtgui::RosNode::ApplicationEventCallback(),
 		ros2qtgui::RosNode::TopicReceptionStatusCallback(),
-		ros2qtgui::RosNode::EquipmentStatusCallback(),
+		ros2qtgui::RosNode::ComponentStatusCallback(),
 		options);
 
 	EXPECT_EQ(node->heartbeatIntervalMs(), 250);
 	EXPECT_EQ(node->guiStatusCheckIntervalMs(), 100);
-	const auto& configurations = node->topicMonitorConfigurations();
+	const auto& configurations = node->componentMonitorConfigurations();
 	ASSERT_EQ(configurations.size(), 1U);
 	EXPECT_EQ(configurations[0].name, QStringLiteral("robot"));
-	EXPECT_EQ(configurations[0].topicName, QStringLiteral("robot/health"));
+	EXPECT_EQ(configurations[0].statusTopicName, QStringLiteral("robot/health"));
 	EXPECT_EQ(configurations[0].timeoutMs, 7000);
 }
 
@@ -532,16 +532,16 @@ TEST(RosNodeParameterTest, RejectsOutOfRangeValues) {
 			},
 			ros2qtgui::RosNode::ApplicationEventCallback(),
 			ros2qtgui::RosNode::TopicReceptionStatusCallback(),
-			ros2qtgui::RosNode::EquipmentStatusCallback(),
+			ros2qtgui::RosNode::ComponentStatusCallback(),
 			options);
 	});
 }
 
-TEST(RosNodeParameterTest, RejectsInvalidTopicMonitorParameters) {
+TEST(RosNodeParameterTest, RejectsInvalidComponentMonitorParameters) {
 	rclcpp::NodeOptions noMonitorNamesOptions;
 	noMonitorNamesOptions.parameter_overrides({
 		rclcpp::Parameter(
-			"topic_monitor_names",
+			"component_monitor_names",
 			std::vector<std::string>()),
 	});
 	EXPECT_ANY_THROW({
@@ -550,14 +550,14 @@ TEST(RosNodeParameterTest, RejectsInvalidTopicMonitorParameters) {
 			},
 			ros2qtgui::RosNode::ApplicationEventCallback(),
 			ros2qtgui::RosNode::TopicReceptionStatusCallback(),
-			ros2qtgui::RosNode::EquipmentStatusCallback(),
+			ros2qtgui::RosNode::ComponentStatusCallback(),
 			noMonitorNamesOptions);
 	});
 
 	rclcpp::NodeOptions invalidMonitorNameOptions;
 	invalidMonitorNameOptions.parameter_overrides({
 		rclcpp::Parameter(
-			"topic_monitor_names",
+			"component_monitor_names",
 			std::vector<std::string>{"camera.status"}),
 	});
 	EXPECT_ANY_THROW({
@@ -566,14 +566,14 @@ TEST(RosNodeParameterTest, RejectsInvalidTopicMonitorParameters) {
 			},
 			ros2qtgui::RosNode::ApplicationEventCallback(),
 			ros2qtgui::RosNode::TopicReceptionStatusCallback(),
-			ros2qtgui::RosNode::EquipmentStatusCallback(),
+			ros2qtgui::RosNode::ComponentStatusCallback(),
 			invalidMonitorNameOptions);
 	});
 
 	rclcpp::NodeOptions duplicateMonitorNameOptions;
 	duplicateMonitorNameOptions.parameter_overrides({
 		rclcpp::Parameter(
-			"topic_monitor_names",
+			"component_monitor_names",
 			std::vector<std::string>{"camera", "camera"}),
 	});
 	EXPECT_ANY_THROW({
@@ -582,13 +582,13 @@ TEST(RosNodeParameterTest, RejectsInvalidTopicMonitorParameters) {
 			},
 			ros2qtgui::RosNode::ApplicationEventCallback(),
 			ros2qtgui::RosNode::TopicReceptionStatusCallback(),
-			ros2qtgui::RosNode::EquipmentStatusCallback(),
+			ros2qtgui::RosNode::ComponentStatusCallback(),
 			duplicateMonitorNameOptions);
 	});
 
 	rclcpp::NodeOptions emptyTopicOptions;
 	emptyTopicOptions.parameter_overrides({
-		rclcpp::Parameter("topic_monitors.camera.topic_name", ""),
+		rclcpp::Parameter("component_monitors.camera.status_topic", ""),
 	});
 	EXPECT_ANY_THROW({
 		auto node = std::make_shared<ros2qtgui::RosNode>(
@@ -596,13 +596,13 @@ TEST(RosNodeParameterTest, RejectsInvalidTopicMonitorParameters) {
 			},
 			ros2qtgui::RosNode::ApplicationEventCallback(),
 			ros2qtgui::RosNode::TopicReceptionStatusCallback(),
-			ros2qtgui::RosNode::EquipmentStatusCallback(),
+			ros2qtgui::RosNode::ComponentStatusCallback(),
 			emptyTopicOptions);
 	});
 
 	rclcpp::NodeOptions duplicateTopicOptions;
 	duplicateTopicOptions.parameter_overrides({
-		rclcpp::Parameter("topic_monitors.plc.topic_name", "camera/status"),
+		rclcpp::Parameter("component_monitors.plc.status_topic", "camera/status"),
 	});
 	EXPECT_ANY_THROW({
 		auto node = std::make_shared<ros2qtgui::RosNode>(
@@ -610,13 +610,13 @@ TEST(RosNodeParameterTest, RejectsInvalidTopicMonitorParameters) {
 			},
 			ros2qtgui::RosNode::ApplicationEventCallback(),
 			ros2qtgui::RosNode::TopicReceptionStatusCallback(),
-			ros2qtgui::RosNode::EquipmentStatusCallback(),
+			ros2qtgui::RosNode::ComponentStatusCallback(),
 			duplicateTopicOptions);
 	});
 
 	rclcpp::NodeOptions timeoutOptions;
 	timeoutOptions.parameter_overrides({
-		rclcpp::Parameter("topic_monitors.camera.timeout_ms", 499),
+		rclcpp::Parameter("component_monitors.camera.timeout_ms", 499),
 	});
 	EXPECT_ANY_THROW({
 		auto node = std::make_shared<ros2qtgui::RosNode>(
@@ -624,14 +624,14 @@ TEST(RosNodeParameterTest, RejectsInvalidTopicMonitorParameters) {
 			},
 			ros2qtgui::RosNode::ApplicationEventCallback(),
 			ros2qtgui::RosNode::TopicReceptionStatusCallback(),
-			ros2qtgui::RosNode::EquipmentStatusCallback(),
+			ros2qtgui::RosNode::ComponentStatusCallback(),
 			timeoutOptions);
 	});
 
 	rclcpp::NodeOptions allDisabledOptions;
 	allDisabledOptions.parameter_overrides({
-		rclcpp::Parameter("topic_monitors.camera.enabled", false),
-		rclcpp::Parameter("topic_monitors.plc.enabled", false),
+		rclcpp::Parameter("component_monitors.camera.enabled", false),
+		rclcpp::Parameter("component_monitors.plc.enabled", false),
 	});
 	EXPECT_ANY_THROW({
 		auto node = std::make_shared<ros2qtgui::RosNode>(
@@ -639,7 +639,7 @@ TEST(RosNodeParameterTest, RejectsInvalidTopicMonitorParameters) {
 			},
 			ros2qtgui::RosNode::ApplicationEventCallback(),
 			ros2qtgui::RosNode::TopicReceptionStatusCallback(),
-			ros2qtgui::RosNode::EquipmentStatusCallback(),
+			ros2qtgui::RosNode::ComponentStatusCallback(),
 			allDisabledOptions);
 	});
 }
@@ -675,13 +675,13 @@ TEST(TopicReceptionIntegrationTest, ReportsIndividualTimeoutAndRecovery) {
 	rclcpp::NodeOptions options;
 	options.use_intra_process_comms(true);
 	options.parameter_overrides({
-		rclcpp::Parameter("topic_monitors.camera.timeout_ms", 500),
-		rclcpp::Parameter("topic_monitors.plc.timeout_ms", 1200),
+		rclcpp::Parameter("component_monitors.camera.timeout_ms", 500),
+		rclcpp::Parameter("component_monitors.plc.timeout_ms", 1200),
 	});
 
 	ros2qtgui::RosQtBridge bridge;
 	TopicReceptionStatusReceiver statusReceiver;
-	EquipmentStatusReceiver equipmentStatusReceiver;
+	ComponentStatusReceiver componentStatusReceiver;
 	ApplicationEventReceiver eventReceiver;
 	QObject::connect(
 		&bridge,
@@ -691,9 +691,9 @@ TEST(TopicReceptionIntegrationTest, ReportsIndividualTimeoutAndRecovery) {
 		Qt::QueuedConnection);
 	QObject::connect(
 		&bridge,
-		&ros2qtgui::RosQtBridge::equipmentStatusUpdated,
-		&equipmentStatusReceiver,
-		&EquipmentStatusReceiver::receiveEquipmentStatus,
+		&ros2qtgui::RosQtBridge::componentStatusUpdated,
+		&componentStatusReceiver,
+		&ComponentStatusReceiver::receiveComponentStatus,
 		Qt::QueuedConnection);
 	QObject::connect(
 		&bridge,
@@ -711,26 +711,26 @@ TEST(TopicReceptionIntegrationTest, ReportsIndividualTimeoutAndRecovery) {
 		[&bridge](const yds::ros2::TopicReceptionStatus& status) {
 			bridge.notifyTopicReceptionStatus(status);
 		},
-		[&bridge](const yds::ros2::EquipmentStatus& status) {
-			bridge.notifyEquipmentStatus(status);
+		[&bridge](const yds::ros2::ComponentStatus& status) {
+			bridge.notifyComponentStatus(status);
 		},
 		options);
 	auto cameraPublisher =
-		node->create_publisher<yds_interfaces::msg::EquipmentStatus>("camera/status", 10);
+		node->create_publisher<yds_interfaces::msg::ComponentStatus>("camera/status", 10);
 	auto plcPublisher =
-		node->create_publisher<yds_interfaces::msg::EquipmentStatus>("plc/status", 10);
+		node->create_publisher<yds_interfaces::msg::ComponentStatus>("plc/status", 10);
 	auto plcKeepAliveTimer = node->create_wall_timer(100ms, [plcPublisher]() {
-		yds_interfaces::msg::EquipmentStatus plcMessage;
-		plcMessage.equipment_id = "plc-1";
-		plcMessage.state = yds_interfaces::msg::EquipmentStatus::STATE_READY;
+		yds_interfaces::msg::ComponentStatus plcMessage;
+		plcMessage.component_id = "plc-1";
+		plcMessage.state = yds_interfaces::msg::ComponentStatus::STATE_READY;
 		plcMessage.message = "connected";
 		plcPublisher->publish(plcMessage);
 	});
 	yds::ros2::ExecutorRunner executorRunner(node);
 
-	yds_interfaces::msg::EquipmentStatus message;
-	message.equipment_id = "camera-1";
-	message.state = yds_interfaces::msg::EquipmentStatus::STATE_READY;
+	yds_interfaces::msg::ComponentStatus message;
+	message.component_id = "camera-1";
+	message.state = yds_interfaces::msg::ComponentStatus::STATE_READY;
 	for (int index = 0; index < 10; ++index) {
 		message.message = "ready-" + std::to_string(index);
 		cameraPublisher->publish(message);
@@ -749,14 +749,14 @@ TEST(TopicReceptionIntegrationTest, ReportsIndividualTimeoutAndRecovery) {
 		statusReceiver.status(QStringLiteral("camera/status")).lastMessage,
 		QStringLiteral("ready-9"));
 	EXPECT_EQ(statusReceiver.receiverThread(), QThread::currentThread());
-	ASSERT_TRUE(equipmentStatusReceiver.hasStatus(QStringLiteral("camera/status")));
+	ASSERT_TRUE(componentStatusReceiver.hasStatus(QStringLiteral("camera/status")));
 	EXPECT_EQ(
-		equipmentStatusReceiver.status(QStringLiteral("camera/status")).state,
-		yds::ros2::EquipmentState::kReady);
+		componentStatusReceiver.status(QStringLiteral("camera/status")).state,
+		yds::ros2::ComponentState::kReady);
 	EXPECT_EQ(
-		equipmentStatusReceiver.status(QStringLiteral("camera/status")).equipmentId,
+		componentStatusReceiver.status(QStringLiteral("camera/status")).componentId,
 		QStringLiteral("camera-1"));
-	EXPECT_EQ(equipmentStatusReceiver.receiverThread(), QThread::currentThread());
+	EXPECT_EQ(componentStatusReceiver.receiverThread(), QThread::currentThread());
 
 	ASSERT_TRUE(waitFor([&statusReceiver]() {
 		return statusReceiver.status(QStringLiteral("camera/status")).state ==
@@ -767,7 +767,7 @@ TEST(TopicReceptionIntegrationTest, ReportsIndividualTimeoutAndRecovery) {
 		yds::ros2::TopicReceptionState::kReceiving);
 	EXPECT_EQ(eventReceiver.lastEvent().level, yds::ros2::ApplicationEventLevel::kWarning);
 
-	message.state = yds_interfaces::msg::EquipmentStatus::STATE_RUNNING;
+	message.state = yds_interfaces::msg::ComponentStatus::STATE_RUNNING;
 	message.message = "running";
 	cameraPublisher->publish(message);
 	ASSERT_TRUE(waitFor([&statusReceiver]() {
@@ -778,13 +778,13 @@ TEST(TopicReceptionIntegrationTest, ReportsIndividualTimeoutAndRecovery) {
 	EXPECT_EQ(
 		statusReceiver.status(QStringLiteral("camera/status")).lastMessage,
 		QStringLiteral("running"));
-	ASSERT_TRUE(waitFor([&equipmentStatusReceiver]() {
-		return equipmentStatusReceiver.status(QStringLiteral("camera/status")).state ==
-			yds::ros2::EquipmentState::kRunning;
+	ASSERT_TRUE(waitFor([&componentStatusReceiver]() {
+		return componentStatusReceiver.status(QStringLiteral("camera/status")).state ==
+			yds::ros2::ComponentState::kRunning;
 	}, 1000));
 	EXPECT_EQ(eventReceiver.lastEvent().level, yds::ros2::ApplicationEventLevel::kInfo);
 
-	message.state = yds_interfaces::msg::EquipmentStatus::STATE_CRITICAL;
+	message.state = yds_interfaces::msg::ComponentStatus::STATE_CRITICAL;
 	message.error_code = 2001;
 	message.message = "emergency stop required";
 	cameraPublisher->publish(message);
@@ -792,10 +792,10 @@ TEST(TopicReceptionIntegrationTest, ReportsIndividualTimeoutAndRecovery) {
 		return eventReceiver.lastEvent().level ==
 			yds::ros2::ApplicationEventLevel::kCritical;
 	}, 1000));
-	ASSERT_TRUE(waitFor([&equipmentStatusReceiver]() {
+	ASSERT_TRUE(waitFor([&componentStatusReceiver]() {
 		const auto status =
-			equipmentStatusReceiver.status(QStringLiteral("camera/status"));
-		return status.state == yds::ros2::EquipmentState::kCritical &&
+			componentStatusReceiver.status(QStringLiteral("camera/status"));
+		return status.state == yds::ros2::ComponentState::kCritical &&
 			status.errorCode == 2001;
 	}, 1000));
 

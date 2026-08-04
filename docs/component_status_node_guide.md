@@ -1,16 +1,17 @@
-# 設備ステータスPublish共通基底ノード 利用ガイド
+# コンポーネントステータスPublish共通基底ノード 利用ガイド
 
 ## 1. 目的
 
-`yds::ros2::EquipmentStatusNode`は、camera、PLCなどの設備ノードから
-`yds_interfaces/msg/EquipmentStatus`を共通の方法で通知するための基底クラスです。
+`yds::ros2::ComponentStatusNode`は、camera、PLCなどの物理設備や、画像処理、点群生成などの
+ロジック機能を実装するノードから
+`yds_interfaces/msg/ComponentStatus`を共通の方法で通知するための基底クラスです。
 
 このクラスは次の処理を提供します。
 
 - 状態変更時の即時Publish
 - 最新状態の定期Publish
 - 初期状態`INITIALIZING`のPublish
-- 設備ID、トピック名、通知周期のROSパラメータ対応
+- コンポーネントID、トピック名、通知周期のROSパラメータ対応
 - 複数スレッドからの状態更新に対する排他制御
 - 最新状態を保持するReliable、Transient Local QoS
 
@@ -23,12 +24,12 @@
 
 #include <QString>
 
-#include <yds/ros2/equipment_status_node.h>
+#include <yds/ros2/component_status_node.h>
 
-class CameraNode final : public yds::ros2::EquipmentStatusNode {
+class CameraNode final : public yds::ros2::ComponentStatusNode {
 public:
 	explicit CameraNode(const rclcpp::NodeOptions& options = rclcpp::NodeOptions())
-		: EquipmentStatusNode(
+		: ComponentStatusNode(
 			"camera_node",
 			QStringLiteral("camera-1"),
 			QStringLiteral("camera/status"),
@@ -36,20 +37,20 @@ public:
 			options) {}
 
 	void notifyReady() {
-		setEquipmentStatus(yds::ros2::EquipmentState::kReady);
+		setComponentStatus(yds::ros2::ComponentState::kReady);
 	}
 
 	void notifyError(qint32 errorCode, const QString& message) {
-		setEquipmentStatus(yds::ros2::EquipmentState::kError, errorCode, message);
+		setComponentStatus(yds::ros2::ComponentState::kError, errorCode, message);
 	}
 };
 ```
 
-`setEquipmentStatus()`は内部状態を更新した直後にPublishします。戻り値が`false`の場合はPublishに
-失敗しています。設備の安全状態を確認し、必要な停止処理や上位通知を派生ノード側で実行してください。
+`setComponentStatus()`は内部状態を更新した直後にPublishします。戻り値が`false`の場合はPublishに
+失敗しています。対象の安全状態を確認し、必要な停止処理や上位通知を派生ノード側で実行してください。
 
 状態が変わらない間も最新状態を設定周期で再Publishします。この定期通知をSupervisor側の
-`TopicReceptionMonitor`で監視すると、設備状態と通信タイムアウトを別々に判定できます。
+`TopicReceptionMonitor`で監視すると、コンポーネント状態と通信タイムアウトを別々に判定できます。
 
 ## 3. ROSパラメータ
 
@@ -57,18 +58,18 @@ public:
 
 | パラメータ | 範囲 | 用途 |
 |---|---:|---|
-| `equipment_status.equipment_id` | 空文字不可 | メッセージへ設定する設備ID |
-| `equipment_status.topic_name` | 空文字不可 | Publish先のトピック名 |
-| `equipment_status.publish_interval_ms` | 100～600000 | 最新状態の定期通知周期 |
+| `component_status.component_id` | 空文字不可 | メッセージへ設定するコンポーネントID |
+| `component_status.status_topic` | 空文字不可 | Publish先のトピック名 |
+| `component_status.publish_interval_ms` | 100～600000 | 最新状態の定期通知周期 |
 
 YAMLによる設定例です。
 
 ```yaml
 camera_node:
   ros__parameters:
-    equipment_status:
-      equipment_id: camera-1
-      topic_name: camera/status
+    component_status:
+      component_id: camera-1
+      status_topic: camera/status
       publish_interval_ms: 1000
 ```
 
@@ -83,10 +84,10 @@ Supervisorの受信タイムアウトは、ネットワーク遅延や処理遅�
 - `CRITICAL`を通知するだけでは設備は停止しません。安全停止は設備固有処理として必ず実装します。
 
 ```cpp
-setEquipmentStatus(yds::ros2::EquipmentState::kCritical, 2001, QStringLiteral("Emergency stop"));
+setComponentStatus(yds::ros2::ComponentState::kCritical, 2001, QStringLiteral("Emergency stop"));
 
 // 復旧後
-setEquipmentStatus(yds::ros2::EquipmentState::kReady, 0, QString());
+setComponentStatus(yds::ros2::ComponentState::kReady, 0, QString());
 ```
 
 ## 5. QoS

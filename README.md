@@ -48,15 +48,15 @@ ros2 run ros2_qt_gui ros2_qt_gui
 起動や設定、エラーなどの重要イベントは、時刻と重要度とともにウィンドウ内へ表示されます。
 表示は最新500件に制限され、古いイベントから自動的に削除されます。
 
-既定では`camera/status`と`plc/status`の`yds_interfaces/msg/EquipmentStatus`を監視します。
-別のターミナルから次のように送信すると、通信状態、設備状態、エラーコード、最終受信時刻、
+既定では`camera/status`と`plc/status`の`yds_interfaces/msg/ComponentStatus`を監視します。
+別のターミナルから次のように送信すると、通信状態、コンポーネント状態、エラーコード、最終受信時刻、
 受信件数、およびメッセージが更新されます。
 
 ```bash
 source /opt/ros/humble/setup.bash
 source install/setup.bash
-ros2 topic pub /camera/status yds_interfaces/msg/EquipmentStatus \
-  "{equipment_id: camera-1, state: 3, error_code: 0, message: capturing}" --rate 1
+ros2 topic pub /camera/status yds_interfaces/msg/ComponentStatus \
+  "{component_id: camera-1, state: 3, error_code: 0, message: capturing}" --rate 1
 ```
 
 受信が設定時間以上途切れると`TIMED OUT`になり、再受信すると`RECEIVING`へ復旧します。初回受信、
@@ -71,21 +71,21 @@ ros2_qt_gui_node:
   ros__parameters:
     heartbeat_interval_ms: 1000
     gui_status_check_interval_ms: 200
-    topic_monitor_names:
+    component_monitor_names:
       - camera
       - plc
-    topic_monitors:
+    component_monitors:
       camera:
         enabled: true
-        topic_name: camera/status
+        status_topic: camera/status
         timeout_ms: 3000
       plc:
         enabled: true
-        topic_name: plc/status
+        status_topic: plc/status
         timeout_ms: 5000
 ```
 
-`topic_monitor_names`へ監視設定名を列挙し、`topic_monitors`以下へ同じ名前の設定を記述します。
+`component_monitor_names`へ監視設定名を列挙し、`component_monitors`以下へ同じ名前の設定を記述します。
 この例ではcameraを3秒、PLCを5秒の受信タイムアウトで監視します。`enabled: false`の設定は
 Subscriptionを作成せず、監視対象から除外されます。
 

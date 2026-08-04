@@ -3,7 +3,7 @@
 #include <QMainWindow>
 
 #include <yds/ros2/application_event.h>
-#include <yds/ros2/equipment_status.h>
+#include <yds/ros2/component_status.h>
 #include <yds/ros2/topic_reception_status.h>
 
 class QLabel;
@@ -33,9 +33,9 @@ public:
 	void setTopicReceptionStatus(
 		const yds::ros2::TopicReceptionStatus& status) noexcept;
 
-	/// @brief 設備状態を更新する
-	/// @param status 表示する設備状態
-	void setEquipmentStatus(const yds::ros2::EquipmentStatus& status) noexcept;
+	/// @brief コンポーネント状態を更新する
+	/// @param status 表示するコンポーネント状態
+	void setComponentStatus(const yds::ros2::ComponentStatus& status) noexcept;
 
 private:
 	int findOrCreateTopicRow(const QString& topicName) noexcept;

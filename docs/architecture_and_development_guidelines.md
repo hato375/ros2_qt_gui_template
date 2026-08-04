@@ -44,7 +44,7 @@ ROS Executorスレッド
 現在のサンプルは、GUIスレッドとROS Executorスレッド、および重要イベントをGUIへ通知する経路を
 実装しています。ワーカースレッドは、実際の処理内容とデータ型が決まった段階で追加します。
 
-サンプルの`yds_interfaces/msg/EquipmentStatus`トピック監視は、Subscriberコールバックから
+サンプルの`yds_interfaces/msg/ComponentStatus`トピック監視は、Subscriberコールバックから
 `yds::ros2::TopicReceptionMonitor`へ受信情報を渡します。共通モニターはROSメッセージ型に依存せず、
 初回受信、受信時刻、受信件数、タイムアウト、および復旧の状態を管理します。camera、PLC、
 Supervisorなどのノードでも、受信メッセージを表示用の`QString`へ変換して同じモニターを
@@ -52,19 +52,25 @@ Supervisorなどのノードでも、受信メッセージを表示用の`QStrin
 所有し、Supervisorとして複数ノードの受信状態を一元監視します。タイムアウト時間はトピックごとに
 設定し、更新周期の異なるcameraやPLCへ同じ値を強制しません。
 
-設備の意味的な状態は、ROS API境界で`yds_interfaces::msg::EquipmentStatus`からQt Core型を使う
-`yds::ros2::EquipmentStatus`へ変換します。通信状態と設備状態は別の型と通知経路で扱います。
+物理設備またはロジック機能の意味的な状態は、ROS API境界で
+`yds_interfaces::msg::ComponentStatus`からQt Core型を使う
+`yds::ros2::ComponentStatus`へ変換します。通信状態とコンポーネント状態は別の型と通知経路で扱います。
 これにより、`RECEIVING`かつ`ERROR`のような状態を失わずに表現できます。
 
-共通パッケージ`yds_ros2`の`equipment_status_conversion.h`は、ROSメッセージとQt設備状態の
+ROS 2 Lifecycleを採用する場合も、Lifecycle状態、トピック受信状態、およびコンポーネント状態は
+別の軸として扱います。Lifecycle状態はノードの管理段階、トピック受信状態は通信の継続性、
+コンポーネント状態は物理設備またはロジック機能の業務上の状態を表します。Lifecycleを使用しない
+通常の`rclcpp::Node`でも、トピック受信監視とコンポーネント状態通知を利用できます。
+
+共通パッケージ`yds_ros2`の`component_status_conversion.h`は、ROSメッセージとQtコンポーネント状態の
 双方向変換を提供します。camera、PLC、Supervisorなどで変換を重複実装せず、このAPIを使用します。
 ROSのゼロ時刻は無効な`QDateTime`へ変換し、受信時刻で補完するか未設定として扱うかは利用側が
 決定します。
 
-設備状態を送信するcamera、PLCなどのノードは、共通基底クラス
-`yds::ros2::EquipmentStatusNode`を継承できます。派生ノードは`setEquipmentStatus()`で状態を更新し、
+コンポーネント状態を送信するcamera、PLCなどのノードは、共通基底クラス
+`yds::ros2::ComponentStatusNode`を継承できます。派生ノードは`setComponentStatus()`で状態を更新し、
 共通基底クラスが変更時の即時通知と最新状態の定期通知を行います。利用方法とパラメータは
-`docs/equipment_status_node_guide.md`を参照してください。
+`docs/component_status_node_guide.md`を参照してください。
 
 新しい機能を実装するときは、GUI固有処理と複数ノードで再利用できる処理を確認します。ROS API境界の
 型変換、状態管理、ログ用共通型などに汎用性がある場合は、依存関係を確認したうえで`yds_ros2`などの

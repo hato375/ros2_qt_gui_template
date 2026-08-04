@@ -174,10 +174,10 @@ src/ros2_qt_gui/config/ros2_qt_gui.yaml
 |---|---:|---:|---|
 | `heartbeat_interval_ms` | 1000 | 100～60000 | ROSハートビート周期 |
 | `gui_status_check_interval_ms` | 200 | 50～10000 | GUIによるROS状態確認周期 |
-| `topic_monitor_names` | `[camera, plc]` | 先頭は英字・`_`、英数字・`_`、重複不可 | 監視設定名の一覧 |
-| `topic_monitors.<name>.enabled` | `true` | `true`または`false` | 監視の有効・無効 |
-| `topic_monitors.<name>.topic_name` | `<name>/status` | 空・重複不可 | 監視する設備状態トピック |
-| `topic_monitors.<name>.timeout_ms` | camera: 3000、PLC: 5000 | 500～600000 | 個別の受信タイムアウト時間 |
+| `component_monitor_names` | `[camera, plc]` | 先頭は英字・`_`、英数字・`_`、重複不可 | 監視設定名の一覧 |
+| `component_monitors.<name>.enabled` | `true` | `true`または`false` | 監視の有効・無効 |
+| `component_monitors.<name>.status_topic` | `<name>/status` | 空・重複不可 | 監視するコンポーネント状態トピック |
+| `component_monitors.<name>.timeout_ms` | camera: 3000、PLC: 5000 | 500～600000 | 個別の受信タイムアウト時間 |
 
 パラメータは起動時に確定する読み取り専用設定です。別のYAMLを指定する場合は次のように起動します。
 
@@ -211,10 +211,10 @@ colcon test-result --verbose
 - アプリケーションイベントの内容と発生時刻がqueued connection経由でQtスレッドへ到達する
 - GUIのイベントログが最新500件に制限される
 - ROSタイマーのハートビートがqueued connection経由で到達する
-- 設備状態トピックの初回受信、個別タイムアウト、および復旧が検出される
+- コンポーネント状態トピックの初回受信、個別タイムアウト、および復旧が検出される
 - 高頻度な受信状況のGUI通知が一定周期に集約される
 - 共通の`TopicReceptionMonitor`が最新値だけを保持し、状態遷移を通知する
-- 共通の`EquipmentStatusNode`が状態変更時と設定周期で最新の設備状態を通知する
+- 共通の`ComponentStatusNode`が状態変更時と設定周期で最新のコンポーネント状態を通知する
 - Executorを複数回停止しても安全に終了する
 - パラメータの既定値と上書き値が適用される
 - 範囲外の値と実行中の変更が拒否される

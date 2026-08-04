@@ -7,7 +7,7 @@ RosQtBridge::RosQtBridge(QObject* parent)
 	qRegisterMetaType<yds::ros2::ApplicationEvent>("yds::ros2::ApplicationEvent");
 	qRegisterMetaType<yds::ros2::TopicReceptionStatus>(
 		"yds::ros2::TopicReceptionStatus");
-	qRegisterMetaType<yds::ros2::EquipmentStatus>("yds::ros2::EquipmentStatus");
+	qRegisterMetaType<yds::ros2::ComponentStatus>("yds::ros2::ComponentStatus");
 }
 
 void RosQtBridge::notifyHeartbeat(std::uint64_t count) noexcept {
@@ -24,9 +24,9 @@ void RosQtBridge::notifyTopicReceptionStatus(
 	emit topicReceptionStatusUpdated(status);
 }
 
-void RosQtBridge::notifyEquipmentStatus(
-	const yds::ros2::EquipmentStatus& status) noexcept {
-	emit equipmentStatusUpdated(status);
+void RosQtBridge::notifyComponentStatus(
+	const yds::ros2::ComponentStatus& status) noexcept {
+	emit componentStatusUpdated(status);
 }
 
 }  // namespace ros2qtgui

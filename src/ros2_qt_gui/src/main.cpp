@@ -30,8 +30,8 @@ int main(int argc, char* argv[]) {
 			[&rosQtBridge](const yds::ros2::TopicReceptionStatus& status) {
 				rosQtBridge.notifyTopicReceptionStatus(status);
 			},
-			[&rosQtBridge](const yds::ros2::EquipmentStatus& status) {
-				rosQtBridge.notifyEquipmentStatus(status);
+			[&rosQtBridge](const yds::ros2::ComponentStatus& status) {
+				rosQtBridge.notifyComponentStatus(status);
 			});
 
 		ros2qtgui::MainWindow mainWindow(
@@ -56,19 +56,19 @@ int main(int argc, char* argv[]) {
 			Qt::QueuedConnection);
 		QObject::connect(
 			&rosQtBridge,
-			&ros2qtgui::RosQtBridge::equipmentStatusUpdated,
+			&ros2qtgui::RosQtBridge::componentStatusUpdated,
 			&mainWindow,
-			&ros2qtgui::MainWindow::setEquipmentStatus,
+			&ros2qtgui::MainWindow::setComponentStatus,
 			Qt::QueuedConnection);
 
-		QStringList topicMonitorDescriptions;
-		for (const auto& configuration : rosNode->topicMonitorConfigurations()) {
-			topicMonitorDescriptions.push_back(
+		QStringList componentMonitorDescriptions;
+		for (const auto& configuration : rosNode->componentMonitorConfigurations()) {
+			componentMonitorDescriptions.push_back(
 				QStringLiteral("%1(topic=%2, timeout_ms=%3)")
-					.arg(configuration.name, configuration.topicName)
+					.arg(configuration.name, configuration.statusTopicName)
 					.arg(configuration.timeoutMs));
 			rosQtBridge.notifyTopicReceptionStatus({
-				configuration.topicName,
+				configuration.statusTopicName,
 				yds::ros2::TopicReceptionState::kWaiting,
 				QDateTime(),
 				0,
@@ -84,10 +84,10 @@ int main(int argc, char* argv[]) {
 			QDateTime::currentDateTime(),
 			QStringLiteral(
 				"Configuration: heartbeat_interval_ms=%1, gui_status_check_interval_ms=%2, "
-				"topic_monitors=[%3]")
+				"component_monitors=[%3]")
 				.arg(rosNode->heartbeatIntervalMs())
 				.arg(rosNode->guiStatusCheckIntervalMs())
-				.arg(topicMonitorDescriptions.join(QStringLiteral(", ")))});
+				.arg(componentMonitorDescriptions.join(QStringLiteral(", ")))});
 
 		yds::ros2::ExecutorRunner executorRunner(rosNode);
 		mainWindow.show();
