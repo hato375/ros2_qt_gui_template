@@ -64,6 +64,7 @@ GUIは`sample_processor/status`だけを監視するデモ専用設定で起動�
 | Component state | 起動直後の`READY`から`RUNNING`へ遷移 |
 | Error code | `0` |
 | Message | `Processed count: ...` |
+| Overall status | `NORMAL (1/1 receiving)` |
 
 ### 4.2 WARNING、ERROR、復旧を確認する
 

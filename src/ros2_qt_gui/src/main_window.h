@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QHash>
 #include <QMainWindow>
 
 #include <yds/ros2/application_event.h>
@@ -46,13 +47,17 @@ public:
 
 private:
 	int findOrCreateTopicRow(const QString& topicName) noexcept;
+	void updateOverallStatus() noexcept;
 	void updateRosStatus() noexcept;
 
 	QLabel* statusLabel_;
+	QLabel* overallStatusLabel_;
 	QLabel* heartbeatLabel_;
 	QTableWidget* topicStatusTable_;
 	QPlainTextEdit* eventLog_;
 	QTimer* statusTimer_;
+	QHash<QString, yds::ros2::TopicReceptionState> receptionStates_;
+	QHash<QString, yds::ros2::ComponentState> componentStates_;
 };
 
 }  // namespace ros2qtgui

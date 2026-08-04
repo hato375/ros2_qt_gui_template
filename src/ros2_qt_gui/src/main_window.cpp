@@ -28,6 +28,44 @@ constexpr int kLastReceivedAtColumn = 6;
 constexpr int kReceivedCountColumn = 7;
 constexpr int kMessageColumn = 8;
 
+enum class OverallStatus {
+	kWaiting,
+	kNormal,
+	kWarning,
+	kError,
+};
+
+QString overallStatusText(OverallStatus status) {
+	switch (status) {
+	case OverallStatus::kWaiting:
+		return QStringLiteral("WAITING");
+	case OverallStatus::kNormal:
+		return QStringLiteral("NORMAL");
+	case OverallStatus::kWarning:
+		return QStringLiteral("WARNING");
+	case OverallStatus::kError:
+		return QStringLiteral("ERROR");
+	}
+	return QStringLiteral("WAITING");
+}
+
+void applyOverallStatusStyle(QLabel* label, OverallStatus status) noexcept {
+	switch (status) {
+	case OverallStatus::kWaiting:
+		label->setStyleSheet(QStringLiteral("background-color: #E0E0E0; color: #000000;"));
+		return;
+	case OverallStatus::kNormal:
+		label->setStyleSheet(QStringLiteral("background-color: #C8E6C9; color: #000000;"));
+		return;
+	case OverallStatus::kWarning:
+		label->setStyleSheet(QStringLiteral("background-color: #FFE082; color: #000000;"));
+		return;
+	case OverallStatus::kError:
+		label->setStyleSheet(QStringLiteral("background-color: #C62828; color: #FFFFFF;"));
+		return;
+	}
+}
+
 void applyReceptionStateStyle(
 	QTableWidgetItem* item,
 	yds::ros2::TopicReceptionState state) noexcept {
@@ -84,6 +122,7 @@ void applyComponentStateStyle(
 
 MainWindow::MainWindow(int statusCheckIntervalMs)
 	: statusLabel_(new QLabel(tr("ROS 2 status: running"), this)),
+	  overallStatusLabel_(new QLabel(this)),
 	  heartbeatLabel_(new QLabel(this)),
 	  topicStatusTable_(new QTableWidget(this)),
 	  eventLog_(new QPlainTextEdit(this)),
@@ -95,6 +134,8 @@ MainWindow::MainWindow(int statusCheckIntervalMs)
 	auto* layout = new QVBoxLayout(centralWidget);
 	layout->addWidget(new QLabel(tr("ROS 2 and Qt are connected."), centralWidget));
 	layout->addWidget(statusLabel_);
+	overallStatusLabel_->setObjectName(QStringLiteral("overallStatusLabel"));
+	layout->addWidget(overallStatusLabel_);
 	layout->addWidget(heartbeatLabel_);
 	layout->addWidget(new QLabel(tr("Monitored components"), centralWidget));
 	topicStatusTable_->setObjectName(QStringLiteral("topicStatusTable"));
@@ -125,6 +166,7 @@ MainWindow::MainWindow(int statusCheckIntervalMs)
 	});
 	statusTimer_->start(statusCheckIntervalMs);
 	setHeartbeatCount(0);
+	updateOverallStatus();
 	updateRosStatus();
 }
 
@@ -158,6 +200,8 @@ void MainWindow::setTopicReceptionStatus(
 	topicStatusTable_->item(targetRow, kLastReceivedAtColumn)->setText(lastReceivedAt);
 	topicStatusTable_->item(targetRow, kReceivedCountColumn)->setText(
 		QString::number(status.receivedCount));
+	receptionStates_.insert(status.topicName, status.state);
+	updateOverallStatus();
 }
 
 void MainWindow::setComponentStatus(
@@ -170,6 +214,8 @@ void MainWindow::setComponentStatus(
 	topicStatusTable_->item(targetRow, kErrorCodeColumn)->setText(
 		QString::number(status.errorCode));
 	topicStatusTable_->item(targetRow, kMessageColumn)->setText(status.message);
+	componentStates_.insert(status.topicName, status.state);
+	updateOverallStatus();
 }
 
 int MainWindow::findOrCreateTopicRow(const QString& topicName) noexcept {
@@ -197,7 +243,56 @@ int MainWindow::findOrCreateTopicRow(const QString& topicName) noexcept {
 		yds::ros2::componentStateText(yds::ros2::ComponentState::kUnknown));
 	applyComponentStateStyle(componentStateItem, yds::ros2::ComponentState::kUnknown);
 	topicStatusTable_->item(targetRow, kErrorCodeColumn)->setText(QStringLiteral("0"));
+	receptionStates_.insert(topicName, yds::ros2::TopicReceptionState::kWaiting);
+	componentStates_.insert(topicName, yds::ros2::ComponentState::kUnknown);
+	updateOverallStatus();
 	return targetRow;
+}
+
+void MainWindow::updateOverallStatus() noexcept {
+	OverallStatus overallStatus = OverallStatus::kNormal;
+	int receivingCount = 0;
+	bool hasWaiting = receptionStates_.isEmpty();
+	bool hasWarning = false;
+	bool hasError = false;
+
+	for (auto iterator = receptionStates_.cbegin(); iterator != receptionStates_.cend(); ++iterator) {
+		const yds::ros2::TopicReceptionState receptionState = iterator.value();
+		const yds::ros2::ComponentState componentState = componentStates_.value(
+			iterator.key(),
+			yds::ros2::ComponentState::kUnknown);
+		if (receptionState == yds::ros2::TopicReceptionState::kReceiving) {
+			++receivingCount;
+		} else if (receptionState == yds::ros2::TopicReceptionState::kWaiting) {
+			hasWaiting = true;
+		} else {
+			hasError = true;
+		}
+
+		if (componentState == yds::ros2::ComponentState::kError ||
+			componentState == yds::ros2::ComponentState::kCritical) {
+			hasError = true;
+		} else if (receptionState == yds::ros2::TopicReceptionState::kReceiving &&
+			(componentState == yds::ros2::ComponentState::kWarning ||
+			 componentState == yds::ros2::ComponentState::kUnknown)) {
+			hasWarning = true;
+		}
+	}
+
+	if (hasError) {
+		overallStatus = OverallStatus::kError;
+	} else if (hasWarning) {
+		overallStatus = OverallStatus::kWarning;
+	} else if (hasWaiting) {
+		overallStatus = OverallStatus::kWaiting;
+	}
+
+	overallStatusLabel_->setText(
+		tr("Overall status: %1 (%2/%3 receiving)")
+			.arg(overallStatusText(overallStatus))
+			.arg(receivingCount)
+			.arg(receptionStates_.size()));
+	applyOverallStatusStyle(overallStatusLabel_, overallStatus);
 }
 
 void MainWindow::updateRosStatus() noexcept {

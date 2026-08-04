@@ -10,6 +10,7 @@
 #include <QElapsedTimer>
 #include <QEventLoop>
 #include <QHash>
+#include <QLabel>
 #include <QObject>
 #include <QPlainTextEdit>
 #include <QTableWidget>
@@ -401,6 +402,115 @@ TEST(MainWindowTest, DisplaysMultipleTopicStatuses) {
 	EXPECT_EQ(
 		topicStatusTable->item(1, 4)->background().color(),
 		QColor(QStringLiteral("#EF9A9A")));
+}
+
+TEST(MainWindowTest, AggregatesOverallStatus) {
+	ros2qtgui::MainWindow mainWindow(200);
+	auto* overallStatusLabel = mainWindow.findChild<QLabel*>(
+		QStringLiteral("overallStatusLabel"));
+	ASSERT_NE(overallStatusLabel, nullptr);
+	EXPECT_EQ(
+		overallStatusLabel->text(),
+		QStringLiteral("Overall status: WAITING (0/0 receiving)"));
+
+	mainWindow.setComponentDisplayName(
+		QStringLiteral("camera/status"),
+		QStringLiteral("Camera"));
+	mainWindow.setComponentDisplayName(
+		QStringLiteral("plc/status"),
+		QStringLiteral("PLC"));
+	EXPECT_EQ(
+		overallStatusLabel->text(),
+		QStringLiteral("Overall status: WAITING (0/2 receiving)"));
+
+	mainWindow.setTopicReceptionStatus({
+		QStringLiteral("camera/status"),
+		yds::ros2::TopicReceptionState::kReceiving,
+		QDateTime::currentDateTime(),
+		1,
+		QString()});
+	EXPECT_EQ(
+		overallStatusLabel->text(),
+		QStringLiteral("Overall status: WARNING (1/2 receiving)"));
+	mainWindow.setComponentStatus({
+		QStringLiteral("camera/status"),
+		QStringLiteral("camera-1"),
+		yds::ros2::ComponentState::kRunning,
+		0,
+		QString(),
+		QDateTime::currentDateTime()});
+	EXPECT_EQ(
+		overallStatusLabel->text(),
+		QStringLiteral("Overall status: WAITING (1/2 receiving)"));
+
+	mainWindow.setTopicReceptionStatus({
+		QStringLiteral("plc/status"),
+		yds::ros2::TopicReceptionState::kReceiving,
+		QDateTime::currentDateTime(),
+		1,
+		QString()});
+	mainWindow.setComponentStatus({
+		QStringLiteral("plc/status"),
+		QStringLiteral("plc-1"),
+		yds::ros2::ComponentState::kReady,
+		0,
+		QString(),
+		QDateTime::currentDateTime()});
+	EXPECT_EQ(
+		overallStatusLabel->text(),
+		QStringLiteral("Overall status: NORMAL (2/2 receiving)"));
+	EXPECT_TRUE(overallStatusLabel->styleSheet().contains(QStringLiteral("#C8E6C9")));
+
+	mainWindow.setComponentStatus({
+		QStringLiteral("camera/status"),
+		QStringLiteral("camera-1"),
+		yds::ros2::ComponentState::kCritical,
+		2001,
+		QString(),
+		QDateTime::currentDateTime()});
+	EXPECT_EQ(
+		overallStatusLabel->text(),
+		QStringLiteral("Overall status: ERROR (2/2 receiving)"));
+
+	mainWindow.setComponentStatus({
+		QStringLiteral("camera/status"),
+		QStringLiteral("camera-1"),
+		yds::ros2::ComponentState::kWarning,
+		1001,
+		QString(),
+		QDateTime::currentDateTime()});
+	EXPECT_EQ(
+		overallStatusLabel->text(),
+		QStringLiteral("Overall status: WARNING (2/2 receiving)"));
+	EXPECT_TRUE(overallStatusLabel->styleSheet().contains(QStringLiteral("#FFE082")));
+
+	mainWindow.setTopicReceptionStatus({
+		QStringLiteral("plc/status"),
+		yds::ros2::TopicReceptionState::kTimedOut,
+		QDateTime::currentDateTime(),
+		1,
+		QString()});
+	EXPECT_EQ(
+		overallStatusLabel->text(),
+		QStringLiteral("Overall status: ERROR (1/2 receiving)"));
+	EXPECT_TRUE(overallStatusLabel->styleSheet().contains(QStringLiteral("#C62828")));
+
+	mainWindow.setTopicReceptionStatus({
+		QStringLiteral("plc/status"),
+		yds::ros2::TopicReceptionState::kReceiving,
+		QDateTime::currentDateTime(),
+		2,
+		QString()});
+	mainWindow.setComponentStatus({
+		QStringLiteral("camera/status"),
+		QStringLiteral("camera-1"),
+		yds::ros2::ComponentState::kStopped,
+		0,
+		QString(),
+		QDateTime::currentDateTime()});
+	EXPECT_EQ(
+		overallStatusLabel->text(),
+		QStringLiteral("Overall status: NORMAL (2/2 receiving)"));
 }
 
 TEST(MainWindowTest, UsesColorsForEveryComponentState) {

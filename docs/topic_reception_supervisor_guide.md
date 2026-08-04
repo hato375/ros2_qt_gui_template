@@ -95,6 +95,19 @@ GUIにはトピックごとに次の情報が表示されます。
 - 受信件数
 - メッセージ
 
+GUI上部には、全監視対象を集約したOverall statusと、`RECEIVING`の対象数を表示します。
+
+| Overall status | 条件 |
+|---|---|
+| `ERROR` | 1件以上が`TIMED OUT`、`ERROR`、または`CRITICAL` |
+| `WARNING` | `ERROR`条件はなく、1件以上が`WARNING`、または受信済みで`UNKNOWN` |
+| `WAITING` | 異常・警告はないが、未受信の監視対象が存在 |
+| `NORMAL` | 全対象が`RECEIVING`で、上記の異常・警告条件がない |
+
+判定は表の上から優先します。`INITIALIZING`、`READY`、`RUNNING`、`STOPPED`は、それだけでは
+Overall statusを異常にしません。`STOPPED`が異常か正常停止かはSupervisorだけでは判断できないため、
+案件固有の運転モードと組み合わせた判定が必要になった時点で追加します。
+
 通信状態とコンポーネント状態は別々のセルを色分けします。通信状態は`WAITING`を灰色、`RECEIVING`を緑、
 `TIMED OUT`を赤で表示します。コンポーネント状態は初期化中を青、準備完了・運転中を緑、注意を黄、異常を赤、
 停止・不明を灰色で表示します。`CRITICAL`は濃い赤と白文字で強調します。
