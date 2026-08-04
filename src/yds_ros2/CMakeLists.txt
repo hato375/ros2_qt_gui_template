@@ -14,6 +14,7 @@ find_package(yds_interfaces REQUIRED)
 
 add_library(${PROJECT_NAME}
 	src/equipment_status_conversion.cpp
+	src/equipment_status_node.cpp
 	src/executor_runner.cpp
 	src/topic_reception_monitor.cpp
 )
@@ -36,6 +37,7 @@ if(BUILD_TESTING)
 	find_package(ament_cmake_gtest REQUIRED)
 
 	ament_add_gtest(yds_ros2_test
+		test/equipment_status_node_test.cpp
 		test/equipment_status_test.cpp
 		test/executor_runner_test.cpp
 		test/topic_reception_monitor_test.cpp
