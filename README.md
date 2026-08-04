@@ -24,7 +24,8 @@ source install/setup.bash
 ```
 
 ワークスペースには、GUIアプリケーションの`ros2_qt_gui`、共通ROS 2ライブラリの`yds_ros2`、
-および共通メッセージ定義の`yds_interfaces`が含まれます。`yds_ros2`の公開APIは
+共通メッセージ定義の`yds_interfaces`、およびロジック系サンプルの`sample_processor`が含まれます。
+`yds_ros2`の公開APIは
 `yds::ros2`名前空間と`yds/ros2`インクルードパスを使用します。
 共通ライブラリでもQt Core型を基本とし、ROS APIが標準C++型を要求する境界で必要な変換を行います。
 `yds::ros2::TopicReceptionMonitor`はROSメッセージ型に依存せず、camera、PLC、Supervisorなどの
@@ -61,6 +62,17 @@ ros2 topic pub /camera/status yds_interfaces/msg/ComponentStatus \
 
 受信が設定時間以上途切れると`TIMED OUT`になり、再受信すると`RECEIVING`へ復旧します。初回受信、
 タイムアウト、および復旧はアプリケーションイベントにも記録されます。
+
+追加の送信コマンドなしで確認する場合は、サンプル処理ノードとGUIを同時に起動できます。
+
+```bash
+source /opt/ros/humble/setup.bash
+colcon build --packages-up-to sample_processor
+source install/setup.bash
+ros2 launch sample_processor component_status_demo.launch.py
+```
+
+詳しい使い方は`docs/sample_processor_guide.md`を参照してください。
 
 ## パラメータ
 
@@ -100,7 +112,7 @@ ros2 launch ros2_qt_gui ros2_qt_gui.launch.py \
 
 ```bash
 source /opt/ros/humble/setup.bash
-colcon test --packages-select yds_interfaces yds_ros2 ros2_qt_gui
+colcon test --packages-select yds_interfaces yds_ros2 ros2_qt_gui sample_processor
 colcon test-result --verbose
 ```
 

@@ -205,6 +205,12 @@ colcon test --packages-select yds_interfaces yds_ros2 ros2_qt_gui
 colcon test-result --verbose
 ```
 
+ロジック系サンプルを含める場合は、`sample_processor`もテスト対象へ追加します。
+
+```bash
+colcon test --packages-select yds_interfaces yds_ros2 ros2_qt_gui sample_processor
+```
+
 現在のテストは次を確認します。
 
 - ROS Executorとは別のスレッドから送信した通知がQtスレッドで処理される
@@ -216,6 +222,7 @@ colcon test-result --verbose
 - 共通の`TopicReceptionMonitor`が最新値だけを保持し、状態遷移を通知する
 - 共通の`ComponentStatusNode`が状態変更時と設定周期で最新のコンポーネント状態を通知する
 - 共通の`ComponentStatusPublisher`を通常のROSノードへ組み込める
+- ロジック系サンプルノードが`INITIALIZING`、`READY`、`RUNNING`を通知する
 - Executorを複数回停止しても安全に終了する
 - パラメータの既定値と上書き値が適用される
 - 範囲外の値と実行中の変更が拒否される

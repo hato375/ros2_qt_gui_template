@@ -76,6 +76,8 @@ ROSのゼロ時刻は無効な`QDateTime`へ変換し、受信時刻で補完す
 `ComponentStatusNode`は通常の`rclcpp::Node`向けの便利クラスとして、ROSパラメータを解決して
 Publisherへ委譲します。別の基底クラスを持つノードは、`ComponentStatusPublisher`をメンバーとして
 所有します。これにより、将来Lifecycle Nodeを採用する場合もコンポーネント状態の実装を再利用できます。
+物理設備を持たないロジック系ノードへの組み込み例は、`sample_processor`パッケージと
+`docs/sample_processor_guide.md`を参照してください。
 
 新しい機能を実装するときは、GUI固有処理と複数ノードで再利用できる処理を確認します。ROS API境界の
 型変換、状態管理、ログ用共通型などに汎用性がある場合は、依存関係を確認したうえで`yds_ros2`などの
