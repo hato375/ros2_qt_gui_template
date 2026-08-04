@@ -71,11 +71,23 @@ ros2_qt_gui_node:
   ros__parameters:
     heartbeat_interval_ms: 1000
     gui_status_check_interval_ms: 200
-    monitored_topics:
-      - camera/status
-      - plc/status
-    topic_reception_timeout_ms: 3000
+    topic_monitor_names:
+      - camera
+      - plc
+    topic_monitors:
+      camera:
+        enabled: true
+        topic_name: camera/status
+        timeout_ms: 3000
+      plc:
+        enabled: true
+        topic_name: plc/status
+        timeout_ms: 5000
 ```
+
+`topic_monitor_names`へ監視設定名を列挙し、`topic_monitors`以下へ同じ名前の設定を記述します。
+この例ではcameraを3秒、PLCを5秒の受信タイムアウトで監視します。`enabled: false`の設定は
+Subscriptionを作成せず、監視対象から除外されます。
 
 別の設定ファイルを指定できます。
 

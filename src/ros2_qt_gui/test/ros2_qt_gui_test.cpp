@@ -477,10 +477,14 @@ TEST(RosNodeParameterTest, UsesDefaultValues) {
 
 	EXPECT_EQ(node->heartbeatIntervalMs(), 1000);
 	EXPECT_EQ(node->guiStatusCheckIntervalMs(), 200);
-	EXPECT_EQ(
-		node->monitoredTopics(),
-		(std::vector<std::string>{"camera/status", "plc/status"}));
-	EXPECT_EQ(node->topicReceptionTimeoutMs(), 3000);
+	const auto& configurations = node->topicMonitorConfigurations();
+	ASSERT_EQ(configurations.size(), 2U);
+	EXPECT_EQ(configurations[0].name, QStringLiteral("camera"));
+	EXPECT_EQ(configurations[0].topicName, QStringLiteral("camera/status"));
+	EXPECT_EQ(configurations[0].timeoutMs, 3000);
+	EXPECT_EQ(configurations[1].name, QStringLiteral("plc"));
+	EXPECT_EQ(configurations[1].topicName, QStringLiteral("plc/status"));
+	EXPECT_EQ(configurations[1].timeoutMs, 5000);
 
 	const auto result = node->set_parameter(rclcpp::Parameter("heartbeat_interval_ms", 500));
 	EXPECT_FALSE(result.successful);
@@ -492,9 +496,12 @@ TEST(RosNodeParameterTest, UsesOverrideValues) {
 		rclcpp::Parameter("heartbeat_interval_ms", 250),
 		rclcpp::Parameter("gui_status_check_interval_ms", 100),
 		rclcpp::Parameter(
-			"monitored_topics",
-			std::vector<std::string>{"camera/status", "robot/status"}),
-		rclcpp::Parameter("topic_reception_timeout_ms", 5000),
+			"topic_monitor_names",
+			std::vector<std::string>{"camera", "robot"}),
+		rclcpp::Parameter("topic_monitors.camera.enabled", false),
+		rclcpp::Parameter("topic_monitors.robot.enabled", true),
+		rclcpp::Parameter("topic_monitors.robot.topic_name", "robot/health"),
+		rclcpp::Parameter("topic_monitors.robot.timeout_ms", 7000),
 	});
 	auto node = std::make_shared<ros2qtgui::RosNode>(
 		[](std::uint64_t) {
@@ -506,10 +513,11 @@ TEST(RosNodeParameterTest, UsesOverrideValues) {
 
 	EXPECT_EQ(node->heartbeatIntervalMs(), 250);
 	EXPECT_EQ(node->guiStatusCheckIntervalMs(), 100);
-	EXPECT_EQ(
-		node->monitoredTopics(),
-		(std::vector<std::string>{"camera/status", "robot/status"}));
-	EXPECT_EQ(node->topicReceptionTimeoutMs(), 5000);
+	const auto& configurations = node->topicMonitorConfigurations();
+	ASSERT_EQ(configurations.size(), 1U);
+	EXPECT_EQ(configurations[0].name, QStringLiteral("robot"));
+	EXPECT_EQ(configurations[0].topicName, QStringLiteral("robot/health"));
+	EXPECT_EQ(configurations[0].timeoutMs, 7000);
 }
 
 TEST(RosNodeParameterTest, RejectsOutOfRangeValues) {
@@ -530,10 +538,10 @@ TEST(RosNodeParameterTest, RejectsOutOfRangeValues) {
 }
 
 TEST(RosNodeParameterTest, RejectsInvalidTopicMonitorParameters) {
-	rclcpp::NodeOptions noTopicsOptions;
-	noTopicsOptions.parameter_overrides({
+	rclcpp::NodeOptions noMonitorNamesOptions;
+	noMonitorNamesOptions.parameter_overrides({
 		rclcpp::Parameter(
-			"monitored_topics",
+			"topic_monitor_names",
 			std::vector<std::string>()),
 	});
 	EXPECT_ANY_THROW({
@@ -543,21 +551,14 @@ TEST(RosNodeParameterTest, RejectsInvalidTopicMonitorParameters) {
 			ros2qtgui::RosNode::ApplicationEventCallback(),
 			ros2qtgui::RosNode::TopicReceptionStatusCallback(),
 			ros2qtgui::RosNode::EquipmentStatusCallback(),
-			noTopicsOptions);
+			noMonitorNamesOptions);
 	});
 
-	rclcpp::NodeOptions emptyTopicOptions;
-	emptyTopicOptions.parameter_overrides({
+	rclcpp::NodeOptions invalidMonitorNameOptions;
+	invalidMonitorNameOptions.parameter_overrides({
 		rclcpp::Parameter(
-			"monitored_topics",
-			std::vector<std::string>{"camera/status", ""}),
-	});
-
-	rclcpp::NodeOptions duplicateTopicOptions;
-	duplicateTopicOptions.parameter_overrides({
-		rclcpp::Parameter(
-			"monitored_topics",
-			std::vector<std::string>{"camera/status", "camera/status"}),
+			"topic_monitor_names",
+			std::vector<std::string>{"camera.status"}),
 	});
 	EXPECT_ANY_THROW({
 		auto node = std::make_shared<ros2qtgui::RosNode>(
@@ -566,7 +567,28 @@ TEST(RosNodeParameterTest, RejectsInvalidTopicMonitorParameters) {
 			ros2qtgui::RosNode::ApplicationEventCallback(),
 			ros2qtgui::RosNode::TopicReceptionStatusCallback(),
 			ros2qtgui::RosNode::EquipmentStatusCallback(),
-			duplicateTopicOptions);
+			invalidMonitorNameOptions);
+	});
+
+	rclcpp::NodeOptions duplicateMonitorNameOptions;
+	duplicateMonitorNameOptions.parameter_overrides({
+		rclcpp::Parameter(
+			"topic_monitor_names",
+			std::vector<std::string>{"camera", "camera"}),
+	});
+	EXPECT_ANY_THROW({
+		auto node = std::make_shared<ros2qtgui::RosNode>(
+			[](std::uint64_t) {
+			},
+			ros2qtgui::RosNode::ApplicationEventCallback(),
+			ros2qtgui::RosNode::TopicReceptionStatusCallback(),
+			ros2qtgui::RosNode::EquipmentStatusCallback(),
+			duplicateMonitorNameOptions);
+	});
+
+	rclcpp::NodeOptions emptyTopicOptions;
+	emptyTopicOptions.parameter_overrides({
+		rclcpp::Parameter("topic_monitors.camera.topic_name", ""),
 	});
 	EXPECT_ANY_THROW({
 		auto node = std::make_shared<ros2qtgui::RosNode>(
@@ -578,9 +600,23 @@ TEST(RosNodeParameterTest, RejectsInvalidTopicMonitorParameters) {
 			emptyTopicOptions);
 	});
 
+	rclcpp::NodeOptions duplicateTopicOptions;
+	duplicateTopicOptions.parameter_overrides({
+		rclcpp::Parameter("topic_monitors.plc.topic_name", "camera/status"),
+	});
+	EXPECT_ANY_THROW({
+		auto node = std::make_shared<ros2qtgui::RosNode>(
+			[](std::uint64_t) {
+			},
+			ros2qtgui::RosNode::ApplicationEventCallback(),
+			ros2qtgui::RosNode::TopicReceptionStatusCallback(),
+			ros2qtgui::RosNode::EquipmentStatusCallback(),
+			duplicateTopicOptions);
+	});
+
 	rclcpp::NodeOptions timeoutOptions;
 	timeoutOptions.parameter_overrides({
-		rclcpp::Parameter("topic_reception_timeout_ms", 499),
+		rclcpp::Parameter("topic_monitors.camera.timeout_ms", 499),
 	});
 	EXPECT_ANY_THROW({
 		auto node = std::make_shared<ros2qtgui::RosNode>(
@@ -590,6 +626,21 @@ TEST(RosNodeParameterTest, RejectsInvalidTopicMonitorParameters) {
 			ros2qtgui::RosNode::TopicReceptionStatusCallback(),
 			ros2qtgui::RosNode::EquipmentStatusCallback(),
 			timeoutOptions);
+	});
+
+	rclcpp::NodeOptions allDisabledOptions;
+	allDisabledOptions.parameter_overrides({
+		rclcpp::Parameter("topic_monitors.camera.enabled", false),
+		rclcpp::Parameter("topic_monitors.plc.enabled", false),
+	});
+	EXPECT_ANY_THROW({
+		auto node = std::make_shared<ros2qtgui::RosNode>(
+			[](std::uint64_t) {
+			},
+			ros2qtgui::RosNode::ApplicationEventCallback(),
+			ros2qtgui::RosNode::TopicReceptionStatusCallback(),
+			ros2qtgui::RosNode::EquipmentStatusCallback(),
+			allDisabledOptions);
 	});
 }
 
@@ -618,13 +669,14 @@ TEST(ExecutorRunnerIntegrationTest, DeliversHeartbeatAndStopsSafely) {
 	executorRunner.stop();
 }
 
-TEST(TopicReceptionIntegrationTest, ReportsReceptionTimeoutAndRecovery) {
+TEST(TopicReceptionIntegrationTest, ReportsIndividualTimeoutAndRecovery) {
 	using namespace std::chrono_literals;
 
 	rclcpp::NodeOptions options;
 	options.use_intra_process_comms(true);
 	options.parameter_overrides({
-		rclcpp::Parameter("topic_reception_timeout_ms", 500),
+		rclcpp::Parameter("topic_monitors.camera.timeout_ms", 500),
+		rclcpp::Parameter("topic_monitors.plc.timeout_ms", 1200),
 	});
 
 	ros2qtgui::RosQtBridge bridge;

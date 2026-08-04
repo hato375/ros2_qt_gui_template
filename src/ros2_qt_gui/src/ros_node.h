@@ -6,6 +6,8 @@
 #include <string>
 #include <vector>
 
+#include <QString>
+
 #include <rclcpp/rclcpp.hpp>
 #include <yds_interfaces/msg/equipment_status.hpp>
 
@@ -15,6 +17,16 @@
 #include <yds/ros2/topic_reception_status.h>
 
 namespace ros2qtgui {
+
+/// @brief 有効なトピック監視設定
+struct TopicMonitorConfiguration {
+	/// @brief 設定内で監視対象を識別する名前
+	QString name;
+	/// @brief 購読するROSトピック名
+	QString topicName;
+	/// @brief 受信タイムアウト時間（ミリ秒）
+	std::int64_t timeoutMs;
+};
 
 /// @brief GUIと連携するROS 2ノード
 class RosNode final : public rclcpp::Node {
@@ -48,13 +60,10 @@ public:
 	/// @return GUI状態確認周期（ミリ秒）
 	std::int64_t guiStatusCheckIntervalMs() const noexcept;
 
-	/// @brief 監視するROSトピック名の一覧を取得する
-	/// @return 監視するROSトピック名の一覧
-	const std::vector<std::string>& monitoredTopics() const noexcept;
-
-	/// @brief トピック受信タイムアウト時間を取得する
-	/// @return トピック受信タイムアウト時間（ミリ秒）
-	std::int64_t topicReceptionTimeoutMs() const noexcept;
+	/// @brief 有効なトピック監視設定の一覧を取得する
+	/// @return 有効なトピック監視設定の一覧
+	const std::vector<TopicMonitorConfiguration>& topicMonitorConfigurations()
+		const noexcept;
 
 private:
 	void onHeartbeat() noexcept;
@@ -82,8 +91,8 @@ private:
 	EquipmentStatusCallback equipmentStatusCallback_;
 	std::int64_t heartbeatIntervalMs_;
 	std::int64_t guiStatusCheckIntervalMs_;
-	std::vector<std::string> monitoredTopics_;
-	std::int64_t topicReceptionTimeoutMs_;
+	std::vector<std::string> topicMonitorNames_;
+	std::vector<TopicMonitorConfiguration> topicMonitorConfigurations_;
 	std::vector<std::unique_ptr<yds::ros2::TopicReceptionMonitor>>
 		topicReceptionMonitors_;
 	std::vector<yds::ros2::EquipmentStatus> latestEquipmentStatuses_;

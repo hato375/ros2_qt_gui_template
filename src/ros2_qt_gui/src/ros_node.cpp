@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <exception>
+#include <regex>
 #include <set>
 #include <stdexcept>
 #include <string>
@@ -25,8 +26,8 @@ constexpr std::int64_t kMaximumHeartbeatIntervalMs = 60000;
 constexpr std::int64_t kDefaultGuiStatusCheckIntervalMs = 200;
 constexpr std::int64_t kMinimumGuiStatusCheckIntervalMs = 50;
 constexpr std::int64_t kMaximumGuiStatusCheckIntervalMs = 10000;
-constexpr char kDefaultCameraStatusTopic[] = "camera/status";
-constexpr char kDefaultPlcStatusTopic[] = "plc/status";
+constexpr char kDefaultCameraMonitorName[] = "camera";
+constexpr char kDefaultPlcMonitorName[] = "plc";
 constexpr std::int64_t kDefaultTopicReceptionTimeoutMs = 3000;
 constexpr std::int64_t kMinimumTopicReceptionTimeoutMs = 500;
 constexpr std::int64_t kMaximumTopicReceptionTimeoutMs = 600000;
@@ -66,6 +67,22 @@ void validateInterval(
 	}
 }
 
+void validateMonitorName(const std::string& monitorName) {
+	static const std::regex validNamePattern("^[A-Za-z_][A-Za-z0-9_]*$");
+	if (!std::regex_match(monitorName, validNamePattern)) {
+		throw std::invalid_argument(
+			"topic monitor names must start with a letter or underscore and contain only "
+			"letters, numbers, and underscores: " +
+			monitorName);
+	}
+}
+
+std::int64_t defaultTimeoutMs(const std::string& monitorName) noexcept {
+	return monitorName == kDefaultPlcMonitorName
+		? 5000
+		: kDefaultTopicReceptionTimeoutMs;
+}
+
 }  // namespace
 
 RosNode::RosNode(
@@ -93,20 +110,14 @@ RosNode::RosNode(
 			  "GUI status check interval in milliseconds.",
 			  kMinimumGuiStatusCheckIntervalMs,
 			  kMaximumGuiStatusCheckIntervalMs))),
-	  monitoredTopics_(declare_parameter<std::vector<std::string>>(
-		  "monitored_topics",
+	  topicMonitorNames_(declare_parameter<std::vector<std::string>>(
+		  "topic_monitor_names",
 		  std::vector<std::string>{
-			  kDefaultCameraStatusTopic,
-			  kDefaultPlcStatusTopic,
+			  kDefaultCameraMonitorName,
+			  kDefaultPlcMonitorName,
 		  },
-		  makeReadOnlyDescriptor("Names of the yds_interfaces/EquipmentStatus topics to monitor."))),
-	  topicReceptionTimeoutMs_(declare_parameter<std::int64_t>(
-		  "topic_reception_timeout_ms",
-		  kDefaultTopicReceptionTimeoutMs,
-		  makeReadOnlyIntegerDescriptor(
-			  "Topic reception timeout in milliseconds.",
-			  kMinimumTopicReceptionTimeoutMs,
-			  kMaximumTopicReceptionTimeoutMs))),
+		  makeReadOnlyDescriptor("Names of topic monitor configurations."))),
+	  topicMonitorConfigurations_(),
 	  topicReceptionMonitors_(),
 	  latestEquipmentStatuses_(),
 	  hasEquipmentStatuses_(),
@@ -125,40 +136,72 @@ RosNode::RosNode(
 		guiStatusCheckIntervalMs_,
 		kMinimumGuiStatusCheckIntervalMs,
 		kMaximumGuiStatusCheckIntervalMs);
-	if (monitoredTopics_.empty()) {
-		throw std::invalid_argument("monitored_topics must not be empty");
+	if (topicMonitorNames_.empty()) {
+		throw std::invalid_argument("topic_monitor_names must not be empty");
 	}
-	std::set<std::string> uniqueTopics;
-	for (const auto& topic : monitoredTopics_) {
-		if (topic.empty()) {
-			throw std::invalid_argument("monitored_topics must not contain an empty topic");
+	std::set<std::string> uniqueMonitorNames;
+	std::set<std::string> uniqueTopicNames;
+	for (const auto& monitorName : topicMonitorNames_) {
+		validateMonitorName(monitorName);
+		if (!uniqueMonitorNames.insert(monitorName).second) {
+			throw std::invalid_argument("topic_monitor_names must not contain duplicates");
 		}
-		if (!uniqueTopics.insert(topic).second) {
-			throw std::invalid_argument("monitored_topics must not contain duplicates");
+
+		const std::string parameterPrefix = "topic_monitors." + monitorName;
+		const bool enabled = declare_parameter<bool>(
+			parameterPrefix + ".enabled",
+			true,
+			makeReadOnlyDescriptor("Whether this topic monitor is enabled."));
+		const std::string topicName = declare_parameter<std::string>(
+			parameterPrefix + ".topic_name",
+			monitorName + "/status",
+			makeReadOnlyDescriptor("yds_interfaces/EquipmentStatus topic name."));
+		const std::int64_t timeoutMs = declare_parameter<std::int64_t>(
+			parameterPrefix + ".timeout_ms",
+			defaultTimeoutMs(monitorName),
+			makeReadOnlyIntegerDescriptor(
+				"Topic reception timeout in milliseconds.",
+				kMinimumTopicReceptionTimeoutMs,
+				kMaximumTopicReceptionTimeoutMs));
+
+		if (topicName.empty()) {
+			throw std::invalid_argument(parameterPrefix + ".topic_name must not be empty");
+		}
+		if (!uniqueTopicNames.insert(topicName).second) {
+			throw std::invalid_argument("topic monitor topic names must not contain duplicates");
+		}
+		validateInterval(
+			parameterPrefix + ".timeout_ms",
+			timeoutMs,
+			kMinimumTopicReceptionTimeoutMs,
+			kMaximumTopicReceptionTimeoutMs);
+		if (enabled) {
+			topicMonitorConfigurations_.push_back({
+				QString::fromStdString(monitorName),
+				QString::fromStdString(topicName),
+				timeoutMs});
 		}
 	}
-	validateInterval(
-		"topic_reception_timeout_ms",
-		topicReceptionTimeoutMs_,
-		kMinimumTopicReceptionTimeoutMs,
-		kMaximumTopicReceptionTimeoutMs);
+	if (topicMonitorConfigurations_.empty()) {
+		throw std::invalid_argument("at least one topic monitor must be enabled");
+	}
 
 	heartbeatTimer_ = create_wall_timer(std::chrono::milliseconds(heartbeatIntervalMs_), [this]() {
 		onHeartbeat();
 	});
-	topicReceptionMonitors_.reserve(monitoredTopics_.size());
-	latestEquipmentStatuses_.reserve(monitoredTopics_.size());
-	hasEquipmentStatuses_.reserve(monitoredTopics_.size());
-	equipmentStatusDirty_.reserve(monitoredTopics_.size());
-	monitoredTopicSubscriptions_.reserve(monitoredTopics_.size());
-	for (std::size_t index = 0; index < monitoredTopics_.size(); ++index) {
-		const auto& topic = monitoredTopics_[index];
+	topicReceptionMonitors_.reserve(topicMonitorConfigurations_.size());
+	latestEquipmentStatuses_.reserve(topicMonitorConfigurations_.size());
+	hasEquipmentStatuses_.reserve(topicMonitorConfigurations_.size());
+	equipmentStatusDirty_.reserve(topicMonitorConfigurations_.size());
+	monitoredTopicSubscriptions_.reserve(topicMonitorConfigurations_.size());
+	for (std::size_t index = 0; index < topicMonitorConfigurations_.size(); ++index) {
+		const auto& configuration = topicMonitorConfigurations_[index];
 		topicReceptionMonitors_.push_back(
 			std::make_unique<yds::ros2::TopicReceptionMonitor>(
-				QString::fromStdString(topic),
-				std::chrono::milliseconds(topicReceptionTimeoutMs_)));
+				configuration.topicName,
+				std::chrono::milliseconds(configuration.timeoutMs)));
 		latestEquipmentStatuses_.push_back({
-			QString::fromStdString(topic),
+			configuration.topicName,
 			QString(),
 			yds::ros2::EquipmentState::kUnknown,
 			0,
@@ -168,7 +211,7 @@ RosNode::RosNode(
 		equipmentStatusDirty_.push_back(false);
 		monitoredTopicSubscriptions_.push_back(
 			create_subscription<yds_interfaces::msg::EquipmentStatus>(
-			topic,
+			configuration.topicName.toStdString(),
 			rclcpp::QoS(10),
 			[this, index](const yds_interfaces::msg::EquipmentStatus::SharedPtr message) {
 				onMonitoredTopic(index, message);
@@ -182,13 +225,19 @@ RosNode::RosNode(
 	RCLCPP_INFO(
 		get_logger(),
 		"Configuration: heartbeat_interval_ms=%ld, gui_status_check_interval_ms=%ld, "
-		"monitored_topic_count=%lu, topic_reception_timeout_ms=%ld",
+		"enabled_topic_monitor_count=%lu",
 		static_cast<long>(heartbeatIntervalMs_),
 		static_cast<long>(guiStatusCheckIntervalMs_),
-		static_cast<unsigned long>(monitoredTopics_.size()),
-		static_cast<long>(topicReceptionTimeoutMs_));
-	for (const auto& topic : monitoredTopics_) {
-		RCLCPP_INFO(get_logger(), "Monitoring topic: %s", topic.c_str());
+		static_cast<unsigned long>(topicMonitorConfigurations_.size()));
+	for (const auto& configuration : topicMonitorConfigurations_) {
+		const QByteArray monitorNameUtf8 = configuration.name.toUtf8();
+		const QByteArray topicNameUtf8 = configuration.topicName.toUtf8();
+		RCLCPP_INFO(
+			get_logger(),
+			"Topic monitor enabled: name=%s, topic=%s, timeout_ms=%ld",
+			monitorNameUtf8.constData(),
+			topicNameUtf8.constData(),
+			static_cast<long>(configuration.timeoutMs));
 	}
 	RCLCPP_INFO(get_logger(), "ROS 2 node started");
 }
@@ -201,12 +250,9 @@ std::int64_t RosNode::guiStatusCheckIntervalMs() const noexcept {
 	return guiStatusCheckIntervalMs_;
 }
 
-const std::vector<std::string>& RosNode::monitoredTopics() const noexcept {
-	return monitoredTopics_;
-}
-
-std::int64_t RosNode::topicReceptionTimeoutMs() const noexcept {
-	return topicReceptionTimeoutMs_;
+const std::vector<TopicMonitorConfiguration>& RosNode::topicMonitorConfigurations()
+	const noexcept {
+	return topicMonitorConfigurations_;
 }
 
 void RosNode::onHeartbeat() noexcept {

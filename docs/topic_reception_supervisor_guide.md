@@ -24,14 +24,36 @@ ros2_qt_gui_node:
   ros__parameters:
     heartbeat_interval_ms: 1000
     gui_status_check_interval_ms: 200
-    monitored_topics:
-      - camera/status
-      - plc/status
-    topic_reception_timeout_ms: 3000
+    topic_monitor_names:
+      - camera
+      - plc
+    topic_monitors:
+      camera:
+        enabled: true
+        topic_name: camera/status
+        timeout_ms: 3000
+      plc:
+        enabled: true
+        topic_name: plc/status
+        timeout_ms: 5000
 ```
 
-`monitored_topics`に空文字列、重複したトピック、または空のリストは指定できません。
-現在は全トピックへ共通のタイムアウト時間を適用します。
+`topic_monitor_names`へ監視設定名を列挙し、`topic_monitors`以下へ同じ名前の設定を記述します。
+設定名は英字またはアンダースコアで始め、英数字とアンダースコアを使用できます。設定名は設定内の
+識別子であり、ROSトピック名とは分離します。
+
+| 項目 | 説明 |
+|---|---|
+| `enabled` | `false`の場合はSubscriptionを作成せず、監視対象から除外 |
+| `topic_name` | 購読する`yds_interfaces/msg/EquipmentStatus`トピック |
+| `timeout_ms` | 受信タイムアウト時間。500～600000ミリ秒 |
+
+設定名、トピック名の重複、空のトピック名、範囲外のタイムアウト、または全設定が無効の場合、
+Supervisorは購読を開始せず起動エラーにします。
+
+監視対象を増やす場合は、例えば`topic_monitor_names`へ`rear_camera`を追加し、
+`topic_monitors.rear_camera`以下へ設定を追加します。トピック名とタイムアウトが同じ設定ブロックに
+まとまるため、監視対象を並べ替えても対応関係は崩れません。
 
 ## 3. 起動と動作確認
 
@@ -77,7 +99,8 @@ GUIにはトピックごとに次の情報が表示されます。
 色だけに依存せず、すべてのセルに状態名も表示します。例えば設備状態が赤い`ERROR`でも、通信セルが
 緑の`RECEIVING`であれば「異常状態のメッセージは継続して受信できている」と判断できます。
 
-送信コマンドを`Ctrl+C`で停止すると、そのトピックだけが3秒後に`TIMED OUT`になります。
+cameraの送信コマンドを`Ctrl+C`で停止すると、cameraだけが3秒後に`TIMED OUT`になります。
+PLCの送信を停止した場合は5秒後に`TIMED OUT`になります。
 他のトピックの受信状態には影響しません。同じコマンドを再実行すると
 `RECEIVING`へ復旧します。
 
