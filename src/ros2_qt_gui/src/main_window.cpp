@@ -18,14 +18,15 @@ namespace ros2qtgui {
 namespace {
 
 constexpr int kMaximumEventLogEntries = 500;
-constexpr int kTopicColumn = 0;
-constexpr int kComponentIdColumn = 1;
-constexpr int kReceptionStateColumn = 2;
-constexpr int kComponentStateColumn = 3;
-constexpr int kErrorCodeColumn = 4;
-constexpr int kLastReceivedAtColumn = 5;
-constexpr int kReceivedCountColumn = 6;
-constexpr int kMessageColumn = 7;
+constexpr int kDisplayNameColumn = 0;
+constexpr int kTopicColumn = 1;
+constexpr int kComponentIdColumn = 2;
+constexpr int kReceptionStateColumn = 3;
+constexpr int kComponentStateColumn = 4;
+constexpr int kErrorCodeColumn = 5;
+constexpr int kLastReceivedAtColumn = 6;
+constexpr int kReceivedCountColumn = 7;
+constexpr int kMessageColumn = 8;
 
 void applyReceptionStateStyle(
 	QTableWidgetItem* item,
@@ -88,7 +89,7 @@ MainWindow::MainWindow(int statusCheckIntervalMs)
 	  eventLog_(new QPlainTextEdit(this)),
 	  statusTimer_(new QTimer(this)) {
 	setWindowTitle(tr("ROS 2 + Qt GUI"));
-	resize(960, 540);
+	resize(1200, 540);
 
 	auto* centralWidget = new QWidget(this);
 	auto* layout = new QVBoxLayout(centralWidget);
@@ -97,8 +98,9 @@ MainWindow::MainWindow(int statusCheckIntervalMs)
 	layout->addWidget(heartbeatLabel_);
 	layout->addWidget(new QLabel(tr("Monitored components"), centralWidget));
 	topicStatusTable_->setObjectName(QStringLiteral("topicStatusTable"));
-	topicStatusTable_->setColumnCount(8);
+	topicStatusTable_->setColumnCount(9);
 	topicStatusTable_->setHorizontalHeaderLabels({
+		tr("Component"),
 		tr("Topic"),
 		tr("Component ID"),
 		tr("Communication"),
@@ -135,6 +137,13 @@ void MainWindow::appendApplicationEvent(const yds::ros2::ApplicationEvent& event
 	eventLog_->appendPlainText(
 		QStringLiteral("[%1] [%2] %3")
 			.arg(timestamp, yds::ros2::eventLevelText(event.level), event.message));
+}
+
+void MainWindow::setComponentDisplayName(
+	const QString& topicName,
+	const QString& displayName) noexcept {
+	const int targetRow = findOrCreateTopicRow(topicName);
+	topicStatusTable_->item(targetRow, kDisplayNameColumn)->setText(displayName);
 }
 
 void MainWindow::setTopicReceptionStatus(

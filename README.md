@@ -89,10 +89,12 @@ ros2_qt_gui_node:
     component_monitors:
       camera:
         enabled: true
+        display_name: Camera
         status_topic: camera/status
         timeout_ms: 3000
       plc:
         enabled: true
+        display_name: PLC
         status_topic: plc/status
         timeout_ms: 5000
 ```

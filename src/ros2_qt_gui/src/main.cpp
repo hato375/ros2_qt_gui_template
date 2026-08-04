@@ -63,9 +63,15 @@ int main(int argc, char* argv[]) {
 
 		QStringList componentMonitorDescriptions;
 		for (const auto& configuration : rosNode->componentMonitorConfigurations()) {
+			mainWindow.setComponentDisplayName(
+				configuration.statusTopicName,
+				configuration.displayName);
 			componentMonitorDescriptions.push_back(
-				QStringLiteral("%1(topic=%2, timeout_ms=%3)")
-					.arg(configuration.name, configuration.statusTopicName)
+				QStringLiteral("%1(display_name=%2, topic=%3, timeout_ms=%4)")
+					.arg(
+						configuration.name,
+						configuration.displayName,
+						configuration.statusTopicName)
 					.arg(configuration.timeoutMs));
 			rosQtBridge.notifyTopicReceptionStatus({
 				configuration.statusTopicName,

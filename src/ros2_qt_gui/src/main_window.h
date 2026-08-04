@@ -28,6 +28,13 @@ public:
 	/// @param event 表示するイベント
 	void appendApplicationEvent(const yds::ros2::ApplicationEvent& event) noexcept;
 
+	/// @brief 監視トピックに対応するコンポーネント表示名を設定する
+	/// @param topicName 監視するROSトピック名
+	/// @param displayName GUIに表示するコンポーネント名
+	void setComponentDisplayName(
+		const QString& topicName,
+		const QString& displayName) noexcept;
+
 	/// @brief ROSトピックの受信状況を更新する
 	/// @param status 表示する受信状況
 	void setTopicReceptionStatus(

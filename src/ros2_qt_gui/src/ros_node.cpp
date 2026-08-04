@@ -152,6 +152,10 @@ RosNode::RosNode(
 			parameterPrefix + ".enabled",
 			true,
 			makeReadOnlyDescriptor("Whether this component monitor is enabled."));
+		const std::string displayName = declare_parameter<std::string>(
+			parameterPrefix + ".display_name",
+			monitorName,
+			makeReadOnlyDescriptor("Component display name."));
 		const std::string topicName = declare_parameter<std::string>(
 			parameterPrefix + ".status_topic",
 			monitorName + "/status",
@@ -164,6 +168,9 @@ RosNode::RosNode(
 				kMinimumTopicReceptionTimeoutMs,
 				kMaximumTopicReceptionTimeoutMs));
 
+		if (displayName.empty()) {
+			throw std::invalid_argument(parameterPrefix + ".display_name must not be empty");
+		}
 		if (topicName.empty()) {
 			throw std::invalid_argument(parameterPrefix + ".status_topic must not be empty");
 		}
@@ -178,6 +185,7 @@ RosNode::RosNode(
 		if (enabled) {
 			componentMonitorConfigurations_.push_back({
 				QString::fromStdString(monitorName),
+				QString::fromStdString(displayName),
 				QString::fromStdString(topicName),
 				timeoutMs});
 		}
@@ -231,11 +239,13 @@ RosNode::RosNode(
 		static_cast<unsigned long>(componentMonitorConfigurations_.size()));
 	for (const auto& configuration : componentMonitorConfigurations_) {
 		const QByteArray monitorNameUtf8 = configuration.name.toUtf8();
+		const QByteArray displayNameUtf8 = configuration.displayName.toUtf8();
 		const QByteArray topicNameUtf8 = configuration.statusTopicName.toUtf8();
 		RCLCPP_INFO(
 			get_logger(),
-			"Component monitor enabled: name=%s, topic=%s, timeout_ms=%ld",
+			"Component monitor enabled: name=%s, display_name=%s, topic=%s, timeout_ms=%ld",
 			monitorNameUtf8.constData(),
+			displayNameUtf8.constData(),
 			topicNameUtf8.constData(),
 			static_cast<long>(configuration.timeoutMs));
 	}

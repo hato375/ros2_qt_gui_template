@@ -176,6 +176,7 @@ src/ros2_qt_gui/config/ros2_qt_gui.yaml
 | `gui_status_check_interval_ms` | 200 | 50～10000 | GUIによるROS状態確認周期 |
 | `component_monitor_names` | `[camera, plc]` | 先頭は英字・`_`、英数字・`_`、重複不可 | 監視設定名の一覧 |
 | `component_monitors.<name>.enabled` | `true` | `true`または`false` | 監視の有効・無効 |
+| `component_monitors.<name>.display_name` | `<name>` | 空文字不可 | GUIに表示するコンポーネント名 |
 | `component_monitors.<name>.status_topic` | `<name>/status` | 空・重複不可 | 監視するコンポーネント状態トピック |
 | `component_monitors.<name>.timeout_ms` | camera: 3000、PLC: 5000 | 500～600000 | 個別の受信タイムアウト時間 |
 

@@ -30,10 +30,12 @@ ros2_qt_gui_node:
     component_monitors:
       camera:
         enabled: true
+        display_name: Camera
         status_topic: camera/status
         timeout_ms: 3000
       plc:
         enabled: true
+        display_name: PLC
         status_topic: plc/status
         timeout_ms: 5000
 ```
@@ -45,6 +47,7 @@ ros2_qt_gui_node:
 | 項目 | 説明 |
 |---|---|
 | `enabled` | `false`の場合はSubscriptionを作成せず、監視対象から除外 |
+| `display_name` | GUIに表示するコンポーネント名。空文字は不可 |
 | `status_topic` | 購読する`yds_interfaces/msg/ComponentStatus`トピック |
 | `timeout_ms` | 受信タイムアウト時間。500～600000ミリ秒 |
 
@@ -85,7 +88,7 @@ ros2 topic pub /plc/status yds_interfaces/msg/ComponentStatus \
 
 GUIにはトピックごとに次の情報が表示されます。
 
-- トピック名とコンポーネントID
+- コンポーネント表示名、トピック名、およびコンポーネントID
 - 通信状態
 - コンポーネント状態とエラーコード
 - 最終受信時刻

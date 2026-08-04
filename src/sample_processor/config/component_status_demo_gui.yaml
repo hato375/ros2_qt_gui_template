@@ -7,5 +7,6 @@ ros2_qt_gui_node:
     component_monitors:
       sample_processor:
         enabled: true
+        display_name: Sample processor
         status_topic: sample_processor/status
         timeout_ms: 3000

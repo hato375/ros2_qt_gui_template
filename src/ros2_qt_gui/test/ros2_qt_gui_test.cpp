@@ -303,7 +303,7 @@ TEST(RosQtBridgeTest, DeliversComponentStatusOnQtThread) {
 			QStringLiteral("camera-1"),
 			yds::ros2::ComponentState::kRunning,
 			0,
-			QStringLiteral("capturing"),
+			QStringLiteral("画像を取得しています"),
 			timestamp});
 	});
 	notifier.join();
@@ -313,7 +313,7 @@ TEST(RosQtBridgeTest, DeliversComponentStatusOnQtThread) {
 	}, 1000));
 	EXPECT_EQ(receiver.lastStatus().componentId, QStringLiteral("camera-1"));
 	EXPECT_EQ(receiver.lastStatus().state, yds::ros2::ComponentState::kRunning);
-	EXPECT_EQ(receiver.lastStatus().message, QStringLiteral("capturing"));
+	EXPECT_EQ(receiver.lastStatus().message, QStringLiteral("画像を取得しています"));
 	EXPECT_EQ(receiver.receiverThread(), QThread::currentThread());
 }
 
@@ -340,6 +340,12 @@ TEST(MainWindowTest, DisplaysMultipleTopicStatuses) {
 	auto* topicStatusTable = mainWindow.findChild<QTableWidget*>(
 		QStringLiteral("topicStatusTable"));
 	ASSERT_NE(topicStatusTable, nullptr);
+	mainWindow.setComponentDisplayName(
+		QStringLiteral("camera/status"),
+		QStringLiteral("Front camera"));
+	mainWindow.setComponentDisplayName(
+		QStringLiteral("plc/status"),
+		QStringLiteral("Main PLC"));
 
 	mainWindow.setTopicReceptionStatus({
 		QStringLiteral("camera/status"),
@@ -369,29 +375,31 @@ TEST(MainWindowTest, DisplaysMultipleTopicStatuses) {
 		QDateTime::currentDateTime()});
 
 	ASSERT_EQ(topicStatusTable->rowCount(), 2);
-	EXPECT_EQ(topicStatusTable->item(0, 0)->text(), QStringLiteral("camera/status"));
-	EXPECT_EQ(topicStatusTable->item(0, 1)->text(), QStringLiteral("camera-1"));
-	EXPECT_EQ(topicStatusTable->item(0, 2)->text(), QStringLiteral("RECEIVING"));
-	EXPECT_EQ(topicStatusTable->item(0, 3)->text(), QStringLiteral("RUNNING"));
-	EXPECT_EQ(topicStatusTable->item(1, 0)->text(), QStringLiteral("plc/status"));
-	EXPECT_EQ(topicStatusTable->item(1, 2)->text(), QStringLiteral("TIMED OUT"));
-	EXPECT_EQ(topicStatusTable->item(1, 3)->text(), QStringLiteral("ERROR"));
-	EXPECT_EQ(topicStatusTable->item(1, 4)->text(), QStringLiteral("1001"));
-	EXPECT_EQ(topicStatusTable->item(1, 7)->text(), QStringLiteral("connection failed"));
-	EXPECT_EQ(
-		topicStatusTable->item(0, 2)->background().color(),
-		QColor(QStringLiteral("#C8E6C9")));
-	EXPECT_EQ(
-		topicStatusTable->item(1, 2)->background().color(),
-		QColor(QStringLiteral("#C62828")));
-	EXPECT_EQ(
-		topicStatusTable->item(1, 2)->foreground().color(),
-		QColor(QStringLiteral("#FFFFFF")));
+	EXPECT_EQ(topicStatusTable->item(0, 0)->text(), QStringLiteral("Front camera"));
+	EXPECT_EQ(topicStatusTable->item(0, 1)->text(), QStringLiteral("camera/status"));
+	EXPECT_EQ(topicStatusTable->item(0, 2)->text(), QStringLiteral("camera-1"));
+	EXPECT_EQ(topicStatusTable->item(0, 3)->text(), QStringLiteral("RECEIVING"));
+	EXPECT_EQ(topicStatusTable->item(0, 4)->text(), QStringLiteral("RUNNING"));
+	EXPECT_EQ(topicStatusTable->item(1, 0)->text(), QStringLiteral("Main PLC"));
+	EXPECT_EQ(topicStatusTable->item(1, 1)->text(), QStringLiteral("plc/status"));
+	EXPECT_EQ(topicStatusTable->item(1, 3)->text(), QStringLiteral("TIMED OUT"));
+	EXPECT_EQ(topicStatusTable->item(1, 4)->text(), QStringLiteral("ERROR"));
+	EXPECT_EQ(topicStatusTable->item(1, 5)->text(), QStringLiteral("1001"));
+	EXPECT_EQ(topicStatusTable->item(1, 8)->text(), QStringLiteral("connection failed"));
 	EXPECT_EQ(
 		topicStatusTable->item(0, 3)->background().color(),
 		QColor(QStringLiteral("#C8E6C9")));
 	EXPECT_EQ(
 		topicStatusTable->item(1, 3)->background().color(),
+		QColor(QStringLiteral("#C62828")));
+	EXPECT_EQ(
+		topicStatusTable->item(1, 3)->foreground().color(),
+		QColor(QStringLiteral("#FFFFFF")));
+	EXPECT_EQ(
+		topicStatusTable->item(0, 4)->background().color(),
+		QColor(QStringLiteral("#C8E6C9")));
+	EXPECT_EQ(
+		topicStatusTable->item(1, 4)->background().color(),
 		QColor(QStringLiteral("#EF9A9A")));
 }
 
@@ -425,7 +433,7 @@ TEST(MainWindowTest, UsesColorsForEveryComponentState) {
 			0,
 			QString(),
 			QDateTime::currentDateTime()});
-		const auto* stateItem = topicStatusTable->item(0, 3);
+		const auto* stateItem = topicStatusTable->item(0, 4);
 		ASSERT_NE(stateItem, nullptr);
 		EXPECT_EQ(
 			stateItem->background().color(),
@@ -460,7 +468,7 @@ TEST(MainWindowTest, UsesColorsForEveryReceptionState) {
 			QDateTime(),
 			0,
 			QString()});
-		const auto* stateItem = topicStatusTable->item(0, 2);
+		const auto* stateItem = topicStatusTable->item(0, 3);
 		ASSERT_NE(stateItem, nullptr);
 		EXPECT_EQ(
 			stateItem->background().color(),
@@ -480,9 +488,11 @@ TEST(RosNodeParameterTest, UsesDefaultValues) {
 	const auto& configurations = node->componentMonitorConfigurations();
 	ASSERT_EQ(configurations.size(), 2U);
 	EXPECT_EQ(configurations[0].name, QStringLiteral("camera"));
+	EXPECT_EQ(configurations[0].displayName, QStringLiteral("camera"));
 	EXPECT_EQ(configurations[0].statusTopicName, QStringLiteral("camera/status"));
 	EXPECT_EQ(configurations[0].timeoutMs, 3000);
 	EXPECT_EQ(configurations[1].name, QStringLiteral("plc"));
+	EXPECT_EQ(configurations[1].displayName, QStringLiteral("plc"));
 	EXPECT_EQ(configurations[1].statusTopicName, QStringLiteral("plc/status"));
 	EXPECT_EQ(configurations[1].timeoutMs, 5000);
 
@@ -500,6 +510,7 @@ TEST(RosNodeParameterTest, UsesOverrideValues) {
 			std::vector<std::string>{"camera", "robot"}),
 		rclcpp::Parameter("component_monitors.camera.enabled", false),
 		rclcpp::Parameter("component_monitors.robot.enabled", true),
+		rclcpp::Parameter("component_monitors.robot.display_name", "Robot controller"),
 		rclcpp::Parameter("component_monitors.robot.status_topic", "robot/health"),
 		rclcpp::Parameter("component_monitors.robot.timeout_ms", 7000),
 	});
@@ -516,6 +527,7 @@ TEST(RosNodeParameterTest, UsesOverrideValues) {
 	const auto& configurations = node->componentMonitorConfigurations();
 	ASSERT_EQ(configurations.size(), 1U);
 	EXPECT_EQ(configurations[0].name, QStringLiteral("robot"));
+	EXPECT_EQ(configurations[0].displayName, QStringLiteral("Robot controller"));
 	EXPECT_EQ(configurations[0].statusTopicName, QStringLiteral("robot/health"));
 	EXPECT_EQ(configurations[0].timeoutMs, 7000);
 }
@@ -589,6 +601,20 @@ TEST(RosNodeParameterTest, RejectsInvalidComponentMonitorParameters) {
 	rclcpp::NodeOptions emptyTopicOptions;
 	emptyTopicOptions.parameter_overrides({
 		rclcpp::Parameter("component_monitors.camera.status_topic", ""),
+	});
+
+	rclcpp::NodeOptions emptyDisplayNameOptions;
+	emptyDisplayNameOptions.parameter_overrides({
+		rclcpp::Parameter("component_monitors.camera.display_name", ""),
+	});
+	EXPECT_ANY_THROW({
+		auto node = std::make_shared<ros2qtgui::RosNode>(
+			[](std::uint64_t) {
+			},
+			ros2qtgui::RosNode::ApplicationEventCallback(),
+			ros2qtgui::RosNode::TopicReceptionStatusCallback(),
+			ros2qtgui::RosNode::ComponentStatusCallback(),
+			emptyDisplayNameOptions);
 	});
 	EXPECT_ANY_THROW({
 		auto node = std::make_shared<ros2qtgui::RosNode>(

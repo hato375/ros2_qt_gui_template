@@ -22,6 +22,8 @@ namespace ros2qtgui {
 struct ComponentMonitorConfiguration {
 	/// @brief 設定内で監視対象を識別する名前
 	QString name;
+	/// @brief GUIに表示するコンポーネント名
+	QString displayName;
 	/// @brief 購読するROSトピック名
 	QString statusTopicName;
 	/// @brief 受信タイムアウト時間（ミリ秒）
