@@ -86,6 +86,7 @@ Supervisorの受信タイムアウトは、ネットワーク遅延や処理遅�
 この利用方法では、設定値の検証とROSパラメータの宣言は所有するノードの責務です。
 
 ```cpp
+#include <chrono>
 #include <memory>
 
 #include <yds/ros2/component_status_publisher.h>
@@ -130,9 +131,11 @@ Lifecycle Nodeでは、`ComponentStatusNode`を継承せず、ROS 2標準の
 `rclcpp_lifecycle::LifecycleNode`を継承します。`ComponentStatusPublisher`はメンバーとして所有します。
 
 ```cpp
+#include <chrono>
 #include <memory>
 
 #include <rclcpp_lifecycle/lifecycle_node.hpp>
+#include <yds/ros2/component_status_parameters.h>
 #include <yds/ros2/component_status_publisher.h>
 
 class LifecycleCameraNode final : public rclcpp_lifecycle::LifecycleNode {
@@ -141,10 +144,12 @@ public:
 		: rclcpp_lifecycle::LifecycleNode("camera_node"),
 		  statusPublisher_(std::make_unique<yds::ros2::ComponentStatusPublisher>(
 			  *this,
-			  yds::ros2::ComponentStatusPublisherConfiguration{
-				  QStringLiteral("camera-1"),
-				  QStringLiteral("camera/status"),
-				  std::chrono::milliseconds(1000)})) {}
+			  yds::ros2::declareComponentStatusPublisherParameters(
+				  *this,
+				  yds::ros2::ComponentStatusPublisherConfiguration{
+					  QStringLiteral("camera-1"),
+					  QStringLiteral("camera/status"),
+					  std::chrono::milliseconds(1000)}))) {}
 
 private:
 	std::unique_ptr<yds::ros2::ComponentStatusPublisher> statusPublisher_;
@@ -159,6 +164,12 @@ Lifecycleコールバックから明示的に設定してください。
 Lifecycle状態からComponentStatusへの自動変換は行いません。Lifecycle状態はノードの管理段階、
 ComponentStatusは設備またはロジック機能の業務状態であり、必ずしも一対一に対応しないためです。
 Lifecycle Nodeを実装するパッケージは、`yds_ros2`に加えて`rclcpp_lifecycle`へ依存してください。
+
+`declareComponentStatusPublisherParameters()`は通常ノードとLifecycle Nodeのどちらでも利用でき、
+3章のROSパラメータを読み取り専用として宣言します。戻り値はパラメータoverrideを反映済みの
+`ComponentStatusPublisherConfiguration`です。これにより、ノード種別が異なっても同じYAML設定と
+入力値検証を使用できます。設定値をコード内で固定する場合は、この関数を使わず、従来どおり
+`ComponentStatusPublisherConfiguration`をPublisherへ直接渡すこともできます。
 
 ## 7. QoS
 

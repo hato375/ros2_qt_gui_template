@@ -11,6 +11,7 @@
 #include <yds_interfaces/msg/component_status.hpp>
 
 #include <yds/ros2/component_status_node.h>
+#include <yds/ros2/component_status_parameters.h>
 #include <yds/ros2/component_status_publisher.h>
 #include <yds/ros2/executor_runner.h>
 
@@ -31,17 +32,32 @@ public:
 
 class TestLifecycleComponentStatusNode final : public rclcpp_lifecycle::LifecycleNode {
 public:
-	TestLifecycleComponentStatusNode()
-		: rclcpp_lifecycle::LifecycleNode("lifecycle_component_status_node_test"),
+	explicit TestLifecycleComponentStatusNode(
+		const rclcpp::NodeOptions& options = rclcpp::NodeOptions())
+		: rclcpp_lifecycle::LifecycleNode("lifecycle_component_status_node_test", options),
 		  statusPublisher_(
 			  *this,
-			  {
-				  QStringLiteral("lifecycle-camera-1"),
-				  QStringLiteral("lifecycle_camera/status"),
-				  100ms}) {}
+			  yds::ros2::declareComponentStatusPublisherParameters(
+				  *this,
+				  {
+					  QStringLiteral("lifecycle-camera-1"),
+					  QStringLiteral("lifecycle_camera/status"),
+					  100ms})) {}
 
 	bool setComponentStatus(yds::ros2::ComponentState state) noexcept {
 		return statusPublisher_.setStatus(state);
+	}
+
+	const QString& componentId() const noexcept {
+		return statusPublisher_.componentId();
+	}
+
+	const QString& statusTopicName() const noexcept {
+		return statusPublisher_.statusTopicName();
+	}
+
+	std::chrono::milliseconds statusPublishInterval() const noexcept {
+		return statusPublisher_.publishInterval();
 	}
 
 private:
@@ -90,7 +106,15 @@ TEST(ComponentStatusPublisherTest, RejectsInvalidConfiguration) {
 }
 
 TEST(ComponentStatusPublisherTest, PublishesHeartbeatWhileLifecycleNodeIsInactive) {
-	auto lifecycleNode = std::make_shared<TestLifecycleComponentStatusNode>();
+	rclcpp::NodeOptions options;
+	options.parameter_overrides({
+		rclcpp::Parameter("component_status.component_id", "lifecycle-camera-2"),
+		rclcpp::Parameter("component_status.status_topic", "lifecycle_camera_2/status"),
+		rclcpp::Parameter("component_status.publish_interval_ms", 150)});
+	auto lifecycleNode = std::make_shared<TestLifecycleComponentStatusNode>(options);
+	EXPECT_EQ(lifecycleNode->componentId(), QStringLiteral("lifecycle-camera-2"));
+	EXPECT_EQ(lifecycleNode->statusTopicName(), QStringLiteral("lifecycle_camera_2/status"));
+	EXPECT_EQ(lifecycleNode->statusPublishInterval(), 150ms);
 	lifecycleNode->configure();
 	lifecycleNode->activate();
 	lifecycleNode->deactivate();
@@ -102,7 +126,7 @@ TEST(ComponentStatusPublisherTest, PublishesHeartbeatWhileLifecycleNodeIsInactiv
 	yds_interfaces::msg::ComponentStatus latestMessage;
 	const auto subscription =
 		receiverNode->create_subscription<yds_interfaces::msg::ComponentStatus>(
-			"lifecycle_camera/status",
+			"lifecycle_camera_2/status",
 			rclcpp::QoS(rclcpp::KeepLast(1)).reliable().transient_local(),
 			[&](const yds_interfaces::msg::ComponentStatus::SharedPtr message) {
 				std::lock_guard<std::mutex> lock(receivedMutex);
@@ -134,7 +158,7 @@ TEST(ComponentStatusPublisherTest, PublishesHeartbeatWhileLifecycleNodeIsInactiv
 
 	std::lock_guard<std::mutex> lock(receivedMutex);
 	EXPECT_GE(receivedCount, 2);
-	EXPECT_EQ(latestMessage.component_id, "lifecycle-camera-1");
+	EXPECT_EQ(latestMessage.component_id, "lifecycle-camera-2");
 	EXPECT_EQ(latestMessage.state, yds_interfaces::msg::ComponentStatus::STATE_READY);
 }
 

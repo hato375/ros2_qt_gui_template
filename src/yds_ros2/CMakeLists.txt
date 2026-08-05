@@ -15,6 +15,7 @@ find_package(yds_interfaces REQUIRED)
 add_library(${PROJECT_NAME}
 	src/component_status_conversion.cpp
 	src/component_status_node.cpp
+	src/component_status_parameters.cpp
 	src/component_status_publisher.cpp
 	src/executor_runner.cpp
 	src/topic_reception_monitor.cpp
