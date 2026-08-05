@@ -1,7 +1,9 @@
 #include <QApplication>
+#include <QCheckBox>
 #include <QColor>
 #include <QHeaderView>
 #include <QLabel>
+#include <QLineEdit>
 #include <QTableWidget>
 
 #include <gtest/gtest.h>
@@ -137,6 +139,68 @@ TEST(ComponentMonitorDialogTest, AggregatesOverallStatusAndNotifiesConsumers) {
 		QString(),
 		QDateTime::currentDateTime()});
 	EXPECT_EQ(notifiedStatus, yds::ros2::widgets::ComponentMonitorDialog::OverallStatus::kNormal);
+}
+
+TEST(ComponentMonitorDialogTest, SortsAndFiltersRowsSafely) {
+	yds::ros2::widgets::ComponentMonitorDialog dialog;
+	auto* table = dialog.findChild<QTableWidget*>(QStringLiteral("topicStatusTable"));
+	auto* filterLineEdit = dialog.findChild<QLineEdit*>(QStringLiteral("filterLineEdit"));
+	auto* attentionOnlyCheckBox = dialog.findChild<QCheckBox*>(
+		QStringLiteral("showAttentionOnlyCheckBox"));
+	ASSERT_NE(table, nullptr);
+	ASSERT_NE(filterLineEdit, nullptr);
+	ASSERT_NE(attentionOnlyCheckBox, nullptr);
+	EXPECT_TRUE(table->isSortingEnabled());
+
+	dialog.setComponentDisplayName(QStringLiteral("camera/status"), QStringLiteral("Zebra camera"));
+	dialog.setComponentDisplayName(QStringLiteral("plc/status"), QStringLiteral("Alpha PLC"));
+	EXPECT_EQ(table->item(0, 1)->text(), QStringLiteral("plc/status"));
+	dialog.setTopicReceptionStatus({
+		QStringLiteral("camera/status"),
+		yds::ros2::TopicReceptionState::kReceiving,
+		QDateTime::currentDateTime(),
+		1,
+		QString()});
+	dialog.setComponentStatus({
+		QStringLiteral("camera/status"),
+		QStringLiteral("camera-1"),
+		yds::ros2::ComponentState::kRunning,
+		0,
+		QStringLiteral("capturing"),
+		QDateTime::currentDateTime()});
+	dialog.setTopicReceptionStatus({
+		QStringLiteral("plc/status"),
+		yds::ros2::TopicReceptionState::kReceiving,
+		QDateTime::currentDateTime(),
+		1,
+		QString()});
+	dialog.setComponentStatus({
+		QStringLiteral("plc/status"),
+		QStringLiteral("plc-1"),
+		yds::ros2::ComponentState::kReady,
+		0,
+		QStringLiteral("connected"),
+		QDateTime::currentDateTime()});
+
+	filterLineEdit->setText(QStringLiteral("camera"));
+	EXPECT_TRUE(table->isRowHidden(0));
+	EXPECT_FALSE(table->isRowHidden(1));
+	filterLineEdit->clear();
+	attentionOnlyCheckBox->setChecked(true);
+	EXPECT_TRUE(table->isRowHidden(0));
+	EXPECT_TRUE(table->isRowHidden(1));
+
+	dialog.setComponentStatus({
+		QStringLiteral("camera/status"),
+		QStringLiteral("camera-1"),
+		yds::ros2::ComponentState::kWarning,
+		1001,
+		QStringLiteral("処理時間が上限に近づいています"),
+		QDateTime::currentDateTime()});
+	EXPECT_TRUE(table->isRowHidden(0));
+	EXPECT_FALSE(table->isRowHidden(1));
+	EXPECT_EQ(table->item(1, 1)->text(), QStringLiteral("camera/status"));
+	EXPECT_EQ(table->item(1, 4)->text(), QStringLiteral("WARNING"));
 }
 
 }  // namespace

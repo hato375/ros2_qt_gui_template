@@ -23,6 +23,35 @@ constexpr int kLastReceivedAtColumn = 6;
 constexpr int kReceivedCountColumn = 7;
 constexpr int kMessageColumn = 8;
 
+class TableSortingGuard final {
+public:
+	explicit TableSortingGuard(QTableWidget* table) noexcept
+		: table_(table),
+		  sortingEnabled_(table->isSortingEnabled()),
+		  sortColumn_(table->horizontalHeader()->sortIndicatorSection()),
+		  sortOrder_(table->horizontalHeader()->sortIndicatorOrder()) {
+		if (sortingEnabled_) {
+			table_->setSortingEnabled(false);
+		}
+	}
+
+	~TableSortingGuard() {
+		if (sortingEnabled_) {
+			table_->setSortingEnabled(true);
+			table_->sortItems(sortColumn_, sortOrder_);
+		}
+	}
+
+	TableSortingGuard(const TableSortingGuard&) = delete;
+	TableSortingGuard& operator=(const TableSortingGuard&) = delete;
+
+private:
+	QTableWidget* table_;
+	bool sortingEnabled_;
+	int sortColumn_;
+	Qt::SortOrder sortOrder_;
+};
+
 void applyReceptionStateStyle(
 	QTableWidgetItem* item,
 	TopicReceptionState state) noexcept {
@@ -94,6 +123,14 @@ ComponentMonitorDialog::ComponentMonitorDialog(QWidget* parent)
 	header->setSectionResizeMode(kMessageColumn, QHeaderView::Stretch);
 	header->resizeSection(kTopicColumn, 180);
 	header->resizeSection(kComponentIdColumn, 160);
+	ui_->topicStatusTable->setSortingEnabled(true);
+	ui_->topicStatusTable->sortItems(kDisplayNameColumn, Qt::AscendingOrder);
+	connect(ui_->filterLineEdit, &QLineEdit::textChanged, this, [this]() {
+		updateRowVisibility();
+	});
+	connect(ui_->showAttentionOnlyCheckBox, &QCheckBox::toggled, this, [this]() {
+		updateRowVisibility();
+	});
 	updateOverallStatus();
 }
 
@@ -102,37 +139,49 @@ ComponentMonitorDialog::~ComponentMonitorDialog() = default;
 void ComponentMonitorDialog::setComponentDisplayName(
 	const QString& topicName,
 	const QString& displayName) noexcept {
-	const int targetRow = findOrCreateTopicRow(topicName);
-	ui_->topicStatusTable->item(targetRow, kDisplayNameColumn)->setText(displayName);
+	{
+		TableSortingGuard sortingGuard(ui_->topicStatusTable);
+		const int targetRow = findOrCreateTopicRow(topicName);
+		ui_->topicStatusTable->item(targetRow, kDisplayNameColumn)->setText(displayName);
+	}
+	updateRowVisibility();
 }
 
 void ComponentMonitorDialog::setTopicReceptionStatus(
 	const TopicReceptionStatus& status) noexcept {
-	const int targetRow = findOrCreateTopicRow(status.topicName);
-	const QString lastReceivedAt = status.lastReceivedAt.isValid()
-		? status.lastReceivedAt.toString(QStringLiteral("yyyy-MM-dd HH:mm:ss.zzz"))
-		: tr("not received");
-	auto* receptionStateItem = ui_->topicStatusTable->item(targetRow, kReceptionStateColumn);
-	receptionStateItem->setText(topicReceptionStateText(status.state));
-	applyReceptionStateStyle(receptionStateItem, status.state);
-	ui_->topicStatusTable->item(targetRow, kLastReceivedAtColumn)->setText(lastReceivedAt);
-	ui_->topicStatusTable->item(targetRow, kReceivedCountColumn)->setText(
-		QString::number(status.receivedCount));
-	receptionStates_.insert(status.topicName, status.state);
+	{
+		TableSortingGuard sortingGuard(ui_->topicStatusTable);
+		const int targetRow = findOrCreateTopicRow(status.topicName);
+		const QString lastReceivedAt = status.lastReceivedAt.isValid()
+			? status.lastReceivedAt.toString(QStringLiteral("yyyy-MM-dd HH:mm:ss.zzz"))
+			: tr("not received");
+		auto* receptionStateItem = ui_->topicStatusTable->item(targetRow, kReceptionStateColumn);
+		receptionStateItem->setText(topicReceptionStateText(status.state));
+		applyReceptionStateStyle(receptionStateItem, status.state);
+		ui_->topicStatusTable->item(targetRow, kLastReceivedAtColumn)->setText(lastReceivedAt);
+		ui_->topicStatusTable->item(targetRow, kReceivedCountColumn)->setText(
+			QString::number(status.receivedCount));
+		receptionStates_.insert(status.topicName, status.state);
+	}
 	updateOverallStatus();
+	updateRowVisibility();
 }
 
 void ComponentMonitorDialog::setComponentStatus(const ComponentStatus& status) noexcept {
-	const int targetRow = findOrCreateTopicRow(status.topicName);
-	ui_->topicStatusTable->item(targetRow, kComponentIdColumn)->setText(status.componentId);
-	auto* componentStateItem = ui_->topicStatusTable->item(targetRow, kComponentStateColumn);
-	componentStateItem->setText(componentStateText(status.state));
-	applyComponentStateStyle(componentStateItem, status.state);
-	ui_->topicStatusTable->item(targetRow, kErrorCodeColumn)->setText(
-		QString::number(status.errorCode));
-	ui_->topicStatusTable->item(targetRow, kMessageColumn)->setText(status.message);
-	componentStates_.insert(status.topicName, status.state);
+	{
+		TableSortingGuard sortingGuard(ui_->topicStatusTable);
+		const int targetRow = findOrCreateTopicRow(status.topicName);
+		ui_->topicStatusTable->item(targetRow, kComponentIdColumn)->setText(status.componentId);
+		auto* componentStateItem = ui_->topicStatusTable->item(targetRow, kComponentStateColumn);
+		componentStateItem->setText(componentStateText(status.state));
+		applyComponentStateStyle(componentStateItem, status.state);
+		ui_->topicStatusTable->item(targetRow, kErrorCodeColumn)->setText(
+			QString::number(status.errorCode));
+		ui_->topicStatusTable->item(targetRow, kMessageColumn)->setText(status.message);
+		componentStates_.insert(status.topicName, status.state);
+	}
 	updateOverallStatus();
+	updateRowVisibility();
 }
 
 int ComponentMonitorDialog::findOrCreateTopicRow(const QString& topicName) noexcept {
@@ -160,6 +209,23 @@ int ComponentMonitorDialog::findOrCreateTopicRow(const QString& topicName) noexc
 	componentStates_.insert(topicName, ComponentState::kUnknown);
 	updateOverallStatus();
 	return targetRow;
+}
+
+bool ComponentMonitorDialog::isAttentionRequired(const QString& topicName) const noexcept {
+	const TopicReceptionState receptionState = receptionStates_.value(
+		topicName,
+		TopicReceptionState::kWaiting);
+	if (receptionState != TopicReceptionState::kReceiving) {
+		return true;
+	}
+
+	const ComponentState componentState = componentStates_.value(
+		topicName,
+		ComponentState::kUnknown);
+	return componentState == ComponentState::kUnknown ||
+		componentState == ComponentState::kWarning ||
+		componentState == ComponentState::kError ||
+		componentState == ComponentState::kCritical;
 }
 
 void ComponentMonitorDialog::updateOverallStatus() noexcept {
@@ -207,6 +273,27 @@ void ComponentMonitorDialog::updateOverallStatus() noexcept {
 			.arg(receptionStates_.size()));
 	ui_->overallStatusLabel->setStyleSheet(overallStatusStyleSheet(overallStatus));
 	emit overallStatusChanged(overallStatus, receivingCount, receptionStates_.size());
+}
+
+void ComponentMonitorDialog::updateRowVisibility() noexcept {
+	const QString filterText = ui_->filterLineEdit->text().trimmed();
+	const bool showAttentionOnly = ui_->showAttentionOnlyCheckBox->isChecked();
+	for (int row = 0; row < ui_->topicStatusTable->rowCount(); ++row) {
+		const auto* topicItem = ui_->topicStatusTable->item(row, kTopicColumn);
+		const QString topicName = topicItem ? topicItem->text() : QString();
+		bool matchesText = filterText.isEmpty();
+		if (!matchesText) {
+			for (int column = 0; column < ui_->topicStatusTable->columnCount(); ++column) {
+				const auto* item = ui_->topicStatusTable->item(row, column);
+				if (item && item->text().contains(filterText, Qt::CaseInsensitive)) {
+					matchesText = true;
+					break;
+				}
+			}
+		}
+		const bool matchesAttention = !showAttentionOnly || isAttentionRequired(topicName);
+		ui_->topicStatusTable->setRowHidden(row, !matchesText || !matchesAttention);
+	}
 }
 
 QString overallStatusText(ComponentMonitorDialog::OverallStatus status) {

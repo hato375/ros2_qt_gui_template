@@ -61,7 +61,9 @@ signals:
 
 private:
 	int findOrCreateTopicRow(const QString& topicName) noexcept;
+	bool isAttentionRequired(const QString& topicName) const noexcept;
 	void updateOverallStatus() noexcept;
+	void updateRowVisibility() noexcept;
 
 	std::unique_ptr<Ui::ComponentMonitorDialog> ui_;
 	QHash<QString, TopicReceptionState> receptionStates_;

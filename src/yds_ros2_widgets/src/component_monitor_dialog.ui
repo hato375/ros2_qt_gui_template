@@ -11,7 +11,7 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>Component monitor</string>
+   <string>コンポーネント監視</string>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
    <item>
@@ -19,7 +19,35 @@
      <property name="text">
       <string/>
      </property>
-    </widget>
+   </widget>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="filterLayout">
+     <item>
+      <widget class="QLabel" name="filterLabel">
+       <property name="text">
+        <string>絞り込み:</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QLineEdit" name="filterLineEdit">
+       <property name="placeholderText">
+        <string>表示名、トピック名、メッセージなどを検索</string>
+       </property>
+       <property name="clearButtonEnabled">
+        <bool>true</bool>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QCheckBox" name="showAttentionOnlyCheckBox">
+       <property name="text">
+        <string>要確認のみ表示</string>
+       </property>
+      </widget>
+     </item>
+    </layout>
    </item>
    <item>
     <widget class="QTableWidget" name="topicStatusTable">
