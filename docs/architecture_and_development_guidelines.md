@@ -75,7 +75,9 @@ ROSのゼロ時刻は無効な`QDateTime`へ変換し、受信時刻で補完す
 状態管理とPublish処理の本体は`yds::ros2::ComponentStatusPublisher`です。
 `ComponentStatusNode`は通常の`rclcpp::Node`向けの便利クラスとして、ROSパラメータを解決して
 Publisherへ委譲します。別の基底クラスを持つノードは、`ComponentStatusPublisher`をメンバーとして
-所有します。これにより、将来Lifecycle Nodeを採用する場合もコンポーネント状態の実装を再利用できます。
+所有します。Lifecycle Nodeでは`rclcpp_lifecycle::LifecycleNode`を継承したままPublisherを所有し、
+Inactive中も死活確認のため定期通知を継続します。Lifecycle状態からコンポーネント状態への自動変換は
+行わず、設備や機能の実態に応じてLifecycleコールバックから明示的に状態を設定します。
 物理設備を持たないロジック系ノードへの組み込み例は、`sample_processor`パッケージと
 `docs/sample_processor_guide.md`を参照してください。
 

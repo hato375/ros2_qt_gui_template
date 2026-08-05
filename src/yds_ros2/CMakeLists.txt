@@ -36,6 +36,7 @@ endif()
 
 if(BUILD_TESTING)
 	find_package(ament_cmake_gtest REQUIRED)
+	find_package(rclcpp_lifecycle REQUIRED)
 
 	ament_add_gtest(yds_ros2_test
 		test/component_status_node_test.cpp
@@ -44,7 +45,7 @@ if(BUILD_TESTING)
 		test/topic_reception_monitor_test.cpp
 	)
 	target_link_libraries(yds_ros2_test ${PROJECT_NAME})
-	ament_target_dependencies(yds_ros2_test rclcpp yds_interfaces)
+	ament_target_dependencies(yds_ros2_test rclcpp rclcpp_lifecycle yds_interfaces)
 
 	if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
 		target_compile_options(yds_ros2_test PRIVATE -Wall -Wextra -Wpedantic)

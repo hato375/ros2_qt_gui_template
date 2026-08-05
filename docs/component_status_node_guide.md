@@ -18,7 +18,7 @@
 コンポーネント固有の初期化、復旧処理、安全停止判断は利用するノードの責務です。
 
 状態通知の実装本体は`ComponentStatusPublisher`へ分離されています。Node Interfaceを介してPublisherと
-Timerを登録するため、`rclcpp::Node`を継承済みのクラスや、将来Lifecycle Nodeを採用するクラスでも
+Timerを登録するため、`rclcpp::Node`を継承済みのクラスやLifecycle Nodeを採用するクラスでも
 同じ状態管理処理を再利用できます。Lifecycle状態とコンポーネント状態は統合せず、別の軸として扱います。
 
 ## 2. 派生ノードの実装例
@@ -124,7 +124,43 @@ setComponentStatus(yds::ros2::ComponentState::kCritical, 2001, QStringLiteral("E
 setComponentStatus(yds::ros2::ComponentState::kReady, 0, QString());
 ```
 
-## 6. QoS
+## 6. Lifecycle Nodeへ組み込む
+
+Lifecycle Nodeでは、`ComponentStatusNode`を継承せず、ROS 2標準の
+`rclcpp_lifecycle::LifecycleNode`を継承します。`ComponentStatusPublisher`はメンバーとして所有します。
+
+```cpp
+#include <memory>
+
+#include <rclcpp_lifecycle/lifecycle_node.hpp>
+#include <yds/ros2/component_status_publisher.h>
+
+class LifecycleCameraNode final : public rclcpp_lifecycle::LifecycleNode {
+public:
+	LifecycleCameraNode()
+		: rclcpp_lifecycle::LifecycleNode("camera_node"),
+		  statusPublisher_(std::make_unique<yds::ros2::ComponentStatusPublisher>(
+			  *this,
+			  yds::ros2::ComponentStatusPublisherConfiguration{
+				  QStringLiteral("camera-1"),
+				  QStringLiteral("camera/status"),
+				  std::chrono::milliseconds(1000)})) {}
+
+private:
+	std::unique_ptr<yds::ros2::ComponentStatusPublisher> statusPublisher_;
+};
+```
+
+`ComponentStatusPublisher`は通常のPublisherとTimerを使用し、Lifecycle Nodeが`INACTIVE`の間も
+最新状態を定期通知します。これにより、Supervisorは正常にInactiveであるノードと、ノード停止や
+通信断を区別できます。Inactive時のコンポーネント状態は、設備の実態に応じて`READY`や`STOPPED`などを
+Lifecycleコールバックから明示的に設定してください。
+
+Lifecycle状態からComponentStatusへの自動変換は行いません。Lifecycle状態はノードの管理段階、
+ComponentStatusは設備またはロジック機能の業務状態であり、必ずしも一対一に対応しないためです。
+Lifecycle Nodeを実装するパッケージは、`yds_ros2`に加えて`rclcpp_lifecycle`へ依存してください。
+
+## 7. QoS
 
 Publisherは`KeepLast(1)`、`Reliable`、`Transient Local`を使用します。監視ノードが同じQoSで
 Subscribeすると、設備ノードより後に起動した場合も、保持された最新状態を受信できます。

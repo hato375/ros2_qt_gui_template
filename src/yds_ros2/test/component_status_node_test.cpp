@@ -7,6 +7,7 @@
 #include <QString>
 
 #include <rclcpp/rclcpp.hpp>
+#include <rclcpp_lifecycle/lifecycle_node.hpp>
 #include <yds_interfaces/msg/component_status.hpp>
 
 #include <yds/ros2/component_status_node.h>
@@ -26,6 +27,25 @@ public:
 			QStringLiteral("camera/status"),
 			100ms,
 			options) {}
+};
+
+class TestLifecycleComponentStatusNode final : public rclcpp_lifecycle::LifecycleNode {
+public:
+	TestLifecycleComponentStatusNode()
+		: rclcpp_lifecycle::LifecycleNode("lifecycle_component_status_node_test"),
+		  statusPublisher_(
+			  *this,
+			  {
+				  QStringLiteral("lifecycle-camera-1"),
+				  QStringLiteral("lifecycle_camera/status"),
+				  100ms}) {}
+
+	bool setComponentStatus(yds::ros2::ComponentState state) noexcept {
+		return statusPublisher_.setStatus(state);
+	}
+
+private:
+	yds::ros2::ComponentStatusPublisher statusPublisher_;
 };
 
 TEST(ComponentStatusPublisherTest, AddsStatusPublishingToRegularNode) {
@@ -67,6 +87,55 @@ TEST(ComponentStatusPublisherTest, RejectsInvalidConfiguration) {
 			*node,
 			{QStringLiteral("component"), QStringLiteral("status"), 99ms}),
 		std::out_of_range);
+}
+
+TEST(ComponentStatusPublisherTest, PublishesHeartbeatWhileLifecycleNodeIsInactive) {
+	auto lifecycleNode = std::make_shared<TestLifecycleComponentStatusNode>();
+	lifecycleNode->configure();
+	lifecycleNode->activate();
+	lifecycleNode->deactivate();
+	ASSERT_EQ(lifecycleNode->get_current_state().label(), "inactive");
+
+	auto receiverNode = std::make_shared<rclcpp::Node>("lifecycle_status_receiver_test");
+	std::mutex receivedMutex;
+	int receivedCount = 0;
+	yds_interfaces::msg::ComponentStatus latestMessage;
+	const auto subscription =
+		receiverNode->create_subscription<yds_interfaces::msg::ComponentStatus>(
+			"lifecycle_camera/status",
+			rclcpp::QoS(rclcpp::KeepLast(1)).reliable().transient_local(),
+			[&](const yds_interfaces::msg::ComponentStatus::SharedPtr message) {
+				std::lock_guard<std::mutex> lock(receivedMutex);
+				latestMessage = *message;
+				++receivedCount;
+			});
+	ASSERT_NE(subscription, nullptr);
+
+	rclcpp::executors::SingleThreadedExecutor executor;
+	executor.add_node(lifecycleNode->get_node_base_interface());
+	executor.add_node(receiverNode);
+	std::thread executorThread([&executor]() {
+		executor.spin();
+	});
+
+	EXPECT_TRUE(lifecycleNode->setComponentStatus(yds::ros2::ComponentState::kReady));
+	const auto deadline = std::chrono::steady_clock::now() + 2s;
+	while (std::chrono::steady_clock::now() < deadline) {
+		{
+			std::lock_guard<std::mutex> lock(receivedMutex);
+			if (receivedCount >= 2) {
+				break;
+			}
+		}
+		std::this_thread::sleep_for(10ms);
+	}
+	executor.cancel();
+	executorThread.join();
+
+	std::lock_guard<std::mutex> lock(receivedMutex);
+	EXPECT_GE(receivedCount, 2);
+	EXPECT_EQ(latestMessage.component_id, "lifecycle-camera-1");
+	EXPECT_EQ(latestMessage.state, yds_interfaces::msg::ComponentStatus::STATE_READY);
 }
 
 TEST(ComponentStatusNodeTest, UsesParameterOverrides) {
