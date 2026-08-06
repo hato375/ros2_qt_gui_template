@@ -22,6 +22,7 @@ add_library(sample_processor_node
 target_include_directories(sample_processor_node
 	PUBLIC
 		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+		$<INSTALL_INTERFACE:include>
 )
 target_link_libraries(sample_processor_node Qt5::Core yds_ros2::yds_ros2)
 ament_target_dependencies(sample_processor_node rcl_interfaces rclcpp std_srvs)
@@ -32,6 +33,7 @@ add_library(sample_lifecycle_processor_node
 target_include_directories(sample_lifecycle_processor_node
 	PUBLIC
 		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+		$<INSTALL_INTERFACE:include>
 )
 target_link_libraries(sample_lifecycle_processor_node Qt5::Core yds_ros2::yds_ros2)
 ament_target_dependencies(
@@ -93,12 +95,37 @@ if(BUILD_TESTING)
 	endif()
 endif()
 
-install(TARGETS sample_processor sample_lifecycle_processor
+install(TARGETS
+	sample_processor
+	sample_lifecycle_processor
 	DESTINATION lib/${PROJECT_NAME}
+)
+
+install(TARGETS sample_processor_node sample_lifecycle_processor_node
+	EXPORT export_${PROJECT_NAME}
+	ARCHIVE DESTINATION lib
+	LIBRARY DESTINATION lib
+	RUNTIME DESTINATION bin
+)
+
+install(DIRECTORY include/
+	DESTINATION include
 )
 
 install(DIRECTORY launch config
 	DESTINATION share/${PROJECT_NAME}
+)
+
+ament_export_targets(export_${PROJECT_NAME} HAS_LIBRARY_TARGET)
+ament_export_include_directories(include)
+ament_export_dependencies(
+	rcl_interfaces
+	rclcpp
+	rclcpp_lifecycle
+	std_srvs
+	Qt5
+	yds_interfaces
+	yds_ros2
 )
 
 ament_package()

@@ -68,7 +68,15 @@ protected:
 	CallbackReturn on_error(const rclcpp_lifecycle::State& previousState) override;
 
 private:
+	using ProcessorHook = bool (SampleLifecycleProcessorNode::*)(QString&);
+
 	void process() noexcept;
+	bool executeProcessorHook(
+		ProcessorHook hook,
+		qint32 errorCode,
+		const char* operationName,
+		const QString& defaultFailureMessage,
+		const QString& exceptionMessage);
 	bool updateComponentStatus(
 		yds::ros2::ComponentState state,
 		qint32 errorCode,

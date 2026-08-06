@@ -1,4 +1,5 @@
 #include <sample_processor/sample_lifecycle_processor_node.h>
+#include <sample_processor/sample_lifecycle_processor_error_codes.h>
 
 #include <chrono>
 #include <stdexcept>
@@ -17,12 +18,6 @@ namespace {
 
 constexpr std::int64_t kMinimumIntervalMs = 100;
 constexpr std::int64_t kMaximumIntervalMs = 600000;
-constexpr qint32 kLifecycleTransitionErrorCode = 9001;
-constexpr qint32 kProcessorConfigurationErrorCode = 9101;
-constexpr qint32 kProcessorActivationErrorCode = 9102;
-constexpr qint32 kProcessorDeactivationErrorCode = 9103;
-constexpr qint32 kProcessorCleanupErrorCode = 9104;
-constexpr qint32 kProcessorShutdownErrorCode = 9105;
 
 rcl_interfaces::msg::ParameterDescriptor processingIntervalDescriptor() {
 	rcl_interfaces::msg::ParameterDescriptor descriptor;
@@ -106,35 +101,55 @@ bool SampleLifecycleProcessorNode::shutdownProcessor(QString&) {
 	return true;
 }
 
-SampleLifecycleProcessorNode::CallbackReturn SampleLifecycleProcessorNode::on_configure(
-	const rclcpp_lifecycle::State&) {
-	RCLCPP_INFO(get_logger(), "Configuring lifecycle sample processor");
+bool SampleLifecycleProcessorNode::executeProcessorHook(
+	ProcessorHook hook,
+	qint32 errorCode,
+	const char* operationName,
+	const QString& defaultFailureMessage,
+	const QString& exceptionMessage) {
 	transitionErrorCode_ = 0;
 	transitionErrorMessage_.clear();
 	QString errorMessage;
 	try {
-		if (!configureProcessor(errorMessage)) {
-			transitionErrorCode_ = kProcessorConfigurationErrorCode;
-			transitionErrorMessage_ = errorMessage.trimmed().isEmpty()
-				? QStringLiteral("Processor configuration failed")
-				: errorMessage;
-			RCLCPP_ERROR(get_logger(), "Lifecycle sample processor configuration failed");
-			return CallbackReturn::ERROR;
+		if ((this->*hook)(errorMessage)) {
+			return true;
 		}
+		transitionErrorCode_ = errorCode;
+		transitionErrorMessage_ = errorMessage.trimmed().isEmpty()
+			? defaultFailureMessage
+			: errorMessage;
+		RCLCPP_ERROR(
+			get_logger(),
+			"Lifecycle sample processor %s failed",
+			operationName);
 	} catch (const std::exception& exception) {
-		transitionErrorCode_ = kProcessorConfigurationErrorCode;
-		transitionErrorMessage_ = QStringLiteral("Processor configuration raised an exception");
+		transitionErrorCode_ = errorCode;
+		transitionErrorMessage_ = exceptionMessage;
 		RCLCPP_ERROR(
 			get_logger(),
-			"Lifecycle sample processor configuration raised an exception: %s",
+			"Lifecycle sample processor %s raised an exception: %s",
+			operationName,
 			exception.what());
-		return CallbackReturn::ERROR;
 	} catch (...) {
-		transitionErrorCode_ = kProcessorConfigurationErrorCode;
-		transitionErrorMessage_ = QStringLiteral("Processor configuration raised an exception");
+		transitionErrorCode_ = errorCode;
+		transitionErrorMessage_ = exceptionMessage;
 		RCLCPP_ERROR(
 			get_logger(),
-			"Lifecycle sample processor configuration raised an unknown exception");
+			"Lifecycle sample processor %s raised an unknown exception",
+			operationName);
+	}
+	return false;
+}
+
+SampleLifecycleProcessorNode::CallbackReturn SampleLifecycleProcessorNode::on_configure(
+	const rclcpp_lifecycle::State&) {
+	RCLCPP_INFO(get_logger(), "Configuring lifecycle sample processor");
+	if (!executeProcessorHook(
+			&SampleLifecycleProcessorNode::configureProcessor,
+			lifecycle_error_code::kConfiguration,
+			"configuration",
+			QStringLiteral("Processor configuration failed"),
+			QStringLiteral("Processor configuration raised an exception"))) {
 		return CallbackReturn::ERROR;
 	}
 	return updateComponentStatus(
@@ -149,30 +164,12 @@ SampleLifecycleProcessorNode::CallbackReturn SampleLifecycleProcessorNode::on_cl
 	const rclcpp_lifecycle::State&) {
 	processingTimer_->cancel();
 	RCLCPP_INFO(get_logger(), "Cleaning up lifecycle sample processor");
-	transitionErrorCode_ = 0;
-	transitionErrorMessage_.clear();
-	QString errorMessage;
-	try {
-		if (!cleanupProcessor(errorMessage)) {
-			transitionErrorCode_ = kProcessorCleanupErrorCode;
-			transitionErrorMessage_ = errorMessage.trimmed().isEmpty()
-				? QStringLiteral("Processor cleanup failed")
-				: errorMessage;
-			RCLCPP_ERROR(get_logger(), "Lifecycle sample processor cleanup failed");
-			return CallbackReturn::ERROR;
-		}
-	} catch (const std::exception& exception) {
-		transitionErrorCode_ = kProcessorCleanupErrorCode;
-		transitionErrorMessage_ = QStringLiteral("Processor cleanup raised an exception");
-		RCLCPP_ERROR(
-			get_logger(),
-			"Lifecycle sample processor cleanup raised an exception: %s",
-			exception.what());
-		return CallbackReturn::ERROR;
-	} catch (...) {
-		transitionErrorCode_ = kProcessorCleanupErrorCode;
-		transitionErrorMessage_ = QStringLiteral("Processor cleanup raised an exception");
-		RCLCPP_ERROR(get_logger(), "Lifecycle sample processor cleanup raised an unknown exception");
+	if (!executeProcessorHook(
+			&SampleLifecycleProcessorNode::cleanupProcessor,
+			lifecycle_error_code::kCleanup,
+			"cleanup",
+			QStringLiteral("Processor cleanup failed"),
+			QStringLiteral("Processor cleanup raised an exception"))) {
 		return CallbackReturn::ERROR;
 	}
 	processedCount_.store(0);
@@ -187,32 +184,12 @@ SampleLifecycleProcessorNode::CallbackReturn SampleLifecycleProcessorNode::on_cl
 SampleLifecycleProcessorNode::CallbackReturn SampleLifecycleProcessorNode::on_activate(
 	const rclcpp_lifecycle::State&) {
 	RCLCPP_INFO(get_logger(), "Activating lifecycle sample processor");
-	transitionErrorCode_ = 0;
-	transitionErrorMessage_.clear();
-	QString errorMessage;
-	try {
-		if (!activateProcessor(errorMessage)) {
-			transitionErrorCode_ = kProcessorActivationErrorCode;
-			transitionErrorMessage_ = errorMessage.trimmed().isEmpty()
-				? QStringLiteral("Processor activation failed")
-				: errorMessage;
-			RCLCPP_ERROR(get_logger(), "Lifecycle sample processor activation failed");
-			return CallbackReturn::ERROR;
-		}
-	} catch (const std::exception& exception) {
-		transitionErrorCode_ = kProcessorActivationErrorCode;
-		transitionErrorMessage_ = QStringLiteral("Processor activation raised an exception");
-		RCLCPP_ERROR(
-			get_logger(),
-			"Lifecycle sample processor activation raised an exception: %s",
-			exception.what());
-		return CallbackReturn::ERROR;
-	} catch (...) {
-		transitionErrorCode_ = kProcessorActivationErrorCode;
-		transitionErrorMessage_ = QStringLiteral("Processor activation raised an exception");
-		RCLCPP_ERROR(
-			get_logger(),
-			"Lifecycle sample processor activation raised an unknown exception");
+	if (!executeProcessorHook(
+			&SampleLifecycleProcessorNode::activateProcessor,
+			lifecycle_error_code::kActivation,
+			"activation",
+			QStringLiteral("Processor activation failed"),
+			QStringLiteral("Processor activation raised an exception"))) {
 		return CallbackReturn::ERROR;
 	}
 	if (!updateComponentStatus(
@@ -229,32 +206,12 @@ SampleLifecycleProcessorNode::CallbackReturn SampleLifecycleProcessorNode::on_de
 	const rclcpp_lifecycle::State&) {
 	processingTimer_->cancel();
 	RCLCPP_INFO(get_logger(), "Deactivating lifecycle sample processor");
-	transitionErrorCode_ = 0;
-	transitionErrorMessage_.clear();
-	QString errorMessage;
-	try {
-		if (!deactivateProcessor(errorMessage)) {
-			transitionErrorCode_ = kProcessorDeactivationErrorCode;
-			transitionErrorMessage_ = errorMessage.trimmed().isEmpty()
-				? QStringLiteral("Processor deactivation failed")
-				: errorMessage;
-			RCLCPP_ERROR(get_logger(), "Lifecycle sample processor deactivation failed");
-			return CallbackReturn::ERROR;
-		}
-	} catch (const std::exception& exception) {
-		transitionErrorCode_ = kProcessorDeactivationErrorCode;
-		transitionErrorMessage_ = QStringLiteral("Processor deactivation raised an exception");
-		RCLCPP_ERROR(
-			get_logger(),
-			"Lifecycle sample processor deactivation raised an exception: %s",
-			exception.what());
-		return CallbackReturn::ERROR;
-	} catch (...) {
-		transitionErrorCode_ = kProcessorDeactivationErrorCode;
-		transitionErrorMessage_ = QStringLiteral("Processor deactivation raised an exception");
-		RCLCPP_ERROR(
-			get_logger(),
-			"Lifecycle sample processor deactivation raised an unknown exception");
+	if (!executeProcessorHook(
+			&SampleLifecycleProcessorNode::deactivateProcessor,
+			lifecycle_error_code::kDeactivation,
+			"deactivation",
+			QStringLiteral("Processor deactivation failed"),
+			QStringLiteral("Processor deactivation raised an exception"))) {
 		return CallbackReturn::ERROR;
 	}
 	return updateComponentStatus(
@@ -269,30 +226,12 @@ SampleLifecycleProcessorNode::CallbackReturn SampleLifecycleProcessorNode::on_sh
 	const rclcpp_lifecycle::State&) {
 	processingTimer_->cancel();
 	RCLCPP_INFO(get_logger(), "Shutting down lifecycle sample processor");
-	transitionErrorCode_ = 0;
-	transitionErrorMessage_.clear();
-	QString errorMessage;
-	try {
-		if (!shutdownProcessor(errorMessage)) {
-			transitionErrorCode_ = kProcessorShutdownErrorCode;
-			transitionErrorMessage_ = errorMessage.trimmed().isEmpty()
-				? QStringLiteral("Processor shutdown failed")
-				: errorMessage;
-			RCLCPP_ERROR(get_logger(), "Lifecycle sample processor shutdown failed");
-			return CallbackReturn::ERROR;
-		}
-	} catch (const std::exception& exception) {
-		transitionErrorCode_ = kProcessorShutdownErrorCode;
-		transitionErrorMessage_ = QStringLiteral("Processor shutdown raised an exception");
-		RCLCPP_ERROR(
-			get_logger(),
-			"Lifecycle sample processor shutdown raised an exception: %s",
-			exception.what());
-		return CallbackReturn::ERROR;
-	} catch (...) {
-		transitionErrorCode_ = kProcessorShutdownErrorCode;
-		transitionErrorMessage_ = QStringLiteral("Processor shutdown raised an exception");
-		RCLCPP_ERROR(get_logger(), "Lifecycle sample processor shutdown raised an unknown exception");
+	if (!executeProcessorHook(
+			&SampleLifecycleProcessorNode::shutdownProcessor,
+			lifecycle_error_code::kShutdown,
+			"shutdown",
+			QStringLiteral("Processor shutdown failed"),
+			QStringLiteral("Processor shutdown raised an exception"))) {
 		return CallbackReturn::ERROR;
 	}
 	return updateComponentStatus(
@@ -308,7 +247,7 @@ SampleLifecycleProcessorNode::CallbackReturn SampleLifecycleProcessorNode::on_er
 	processingTimer_->cancel();
 	RCLCPP_ERROR(get_logger(), "Lifecycle sample processor transition failed");
 	const qint32 errorCode = transitionErrorCode_ == 0
-		? kLifecycleTransitionErrorCode
+		? lifecycle_error_code::kTransition
 		: transitionErrorCode_;
 	const QString errorMessage = transitionErrorMessage_.isEmpty()
 		? QStringLiteral("Lifecycle transition failed")

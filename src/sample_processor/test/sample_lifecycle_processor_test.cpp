@@ -12,6 +12,7 @@
 #include <yds_interfaces/msg/component_status.hpp>
 
 #include <sample_processor/sample_lifecycle_processor_node.h>
+#include <sample_processor/sample_lifecycle_processor_error_codes.h>
 #include <yds/ros2/component_status.h>
 #include <yds/ros2/topic_reception_monitor.h>
 
@@ -273,7 +274,7 @@ TEST(SampleLifecycleProcessorNodeTest, ReportsConfigureFailureAsComponentError) 
 	EXPECT_EQ(node->get_current_state().label(), "unconfigured");
 	const yds::ros2::ComponentStatus status = node->componentStatus();
 	EXPECT_EQ(status.state, yds::ros2::ComponentState::kError);
-	EXPECT_EQ(status.errorCode, 9101);
+	EXPECT_EQ(status.errorCode, sampleprocessor::lifecycle_error_code::kConfiguration);
 	EXPECT_EQ(status.message, QStringLiteral("Camera connection failed"));
 
 	rclcpp::executors::SingleThreadedExecutor executor;
@@ -300,7 +301,9 @@ TEST(SampleLifecycleProcessorNodeTest, ReportsConfigureFailureAsComponentError) 
 		std::lock_guard<std::mutex> lock(receivedMutex);
 		EXPECT_GE(receivedCount, 3U);
 		EXPECT_EQ(latestMessage.state, yds_interfaces::msg::ComponentStatus::STATE_ERROR);
-		EXPECT_EQ(latestMessage.error_code, 9101);
+		EXPECT_EQ(
+			latestMessage.error_code,
+			sampleprocessor::lifecycle_error_code::kConfiguration);
 		EXPECT_EQ(latestMessage.message, "Camera connection failed");
 		EXPECT_EQ(
 			receptionMonitor.status().state,
@@ -327,7 +330,7 @@ TEST(SampleLifecycleProcessorNodeTest, ReportsActivateFailureAsComponentError) {
 	EXPECT_EQ(node->get_current_state().label(), "unconfigured");
 	const yds::ros2::ComponentStatus status = node->componentStatus();
 	EXPECT_EQ(status.state, yds::ros2::ComponentState::kError);
-	EXPECT_EQ(status.errorCode, 9102);
+	EXPECT_EQ(status.errorCode, sampleprocessor::lifecycle_error_code::kActivation);
 	EXPECT_EQ(status.message, QStringLiteral("Processor start failed"));
 
 	node->configure();
@@ -347,7 +350,9 @@ TEST(SampleLifecycleProcessorNodeTest, HandlesConfigureStandardExceptionAndRecov
 	EXPECT_NO_THROW(node->configure());
 	EXPECT_EQ(node->get_current_state().label(), "unconfigured");
 	EXPECT_EQ(node->componentStatus().state, yds::ros2::ComponentState::kError);
-	EXPECT_EQ(node->componentStatus().errorCode, 9101);
+	EXPECT_EQ(
+		node->componentStatus().errorCode,
+		sampleprocessor::lifecycle_error_code::kConfiguration);
 	EXPECT_EQ(
 		node->componentStatus().message,
 		QStringLiteral("Processor configuration raised an exception"));
@@ -367,7 +372,9 @@ TEST(SampleLifecycleProcessorNodeTest, HandlesActivateUnknownExceptionAndRecover
 	EXPECT_NO_THROW(node->activate());
 	EXPECT_EQ(node->get_current_state().label(), "unconfigured");
 	EXPECT_EQ(node->componentStatus().state, yds::ros2::ComponentState::kError);
-	EXPECT_EQ(node->componentStatus().errorCode, 9102);
+	EXPECT_EQ(
+		node->componentStatus().errorCode,
+		sampleprocessor::lifecycle_error_code::kActivation);
 	EXPECT_EQ(
 		node->componentStatus().message,
 		QStringLiteral("Processor activation raised an exception"));
@@ -389,7 +396,9 @@ TEST(SampleLifecycleProcessorNodeTest, ReportsDeactivateFailureAndRecovers) {
 	node->deactivate();
 	EXPECT_EQ(node->get_current_state().label(), "unconfigured");
 	EXPECT_EQ(node->componentStatus().state, yds::ros2::ComponentState::kError);
-	EXPECT_EQ(node->componentStatus().errorCode, 9103);
+	EXPECT_EQ(
+		node->componentStatus().errorCode,
+		sampleprocessor::lifecycle_error_code::kDeactivation);
 	EXPECT_EQ(
 		node->componentStatus().message,
 		QStringLiteral("Robot stop confirmation failed"));
@@ -410,7 +419,9 @@ TEST(SampleLifecycleProcessorNodeTest, HandlesCleanupExceptionAndRecovers) {
 	EXPECT_NO_THROW(node->cleanup());
 	EXPECT_EQ(node->get_current_state().label(), "unconfigured");
 	EXPECT_EQ(node->componentStatus().state, yds::ros2::ComponentState::kError);
-	EXPECT_EQ(node->componentStatus().errorCode, 9104);
+	EXPECT_EQ(
+		node->componentStatus().errorCode,
+		sampleprocessor::lifecycle_error_code::kCleanup);
 	EXPECT_EQ(
 		node->componentStatus().message,
 		QStringLiteral("Processor cleanup raised an exception"));
@@ -430,7 +441,9 @@ TEST(SampleLifecycleProcessorNodeTest, ReportsShutdownFailureAndAllowsRetry) {
 	node->shutdown();
 	EXPECT_EQ(node->get_current_state().label(), "unconfigured");
 	EXPECT_EQ(node->componentStatus().state, yds::ros2::ComponentState::kError);
-	EXPECT_EQ(node->componentStatus().errorCode, 9105);
+	EXPECT_EQ(
+		node->componentStatus().errorCode,
+		sampleprocessor::lifecycle_error_code::kShutdown);
 	EXPECT_EQ(
 		node->componentStatus().message,
 		QStringLiteral("PLC shutdown acknowledgement failed"));
