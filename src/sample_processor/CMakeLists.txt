@@ -69,6 +69,7 @@ endif()
 
 if(BUILD_TESTING)
 	find_package(ament_cmake_gtest REQUIRED)
+	find_package(launch_testing_ament_cmake REQUIRED)
 
 	ament_add_gtest(sample_processor_test
 		SKIP_LINKING_MAIN_LIBRARIES
@@ -93,6 +94,11 @@ if(BUILD_TESTING)
 	elseif(MSVC)
 		target_compile_options(sample_processor_test PRIVATE /W4)
 	endif()
+
+	add_launch_test(
+		test/sample_lifecycle_processor_launch_test.py
+		TIMEOUT 60
+	)
 endif()
 
 install(TARGETS

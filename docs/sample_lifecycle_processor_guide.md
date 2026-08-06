@@ -88,6 +88,15 @@ Component stateだけが`INITIALIZING`、`READY`、`RUNNING`、`STOPPED`へ変�
 Inactive中もCommunicationは`RECEIVING`のままです。ノードを終了すると、既定では3秒後に
 `TIMED OUT`へ変化します。
 
+実プロセスの結合テストは、Lifecycleサービスを使ってconfigure、activate、shutdownを実行し、
+各段階のLifecycle状態とComponentStatusをブラックボックスで検証します。次のコマンドで実行できます。
+
+```bash
+colcon test --packages-select sample_processor \
+  --ctest-args -R sample_lifecycle_processor_launch_test
+colcon test-result --verbose
+```
+
 ## 5. パラメータ
 
 | パラメータ | 既定値 | 範囲 | 用途 |

@@ -37,6 +37,8 @@ Testing/
 
 # テスト・カバレッジの生成物
 /coverage/
+__pycache__/
+*.pyc
 *.gcda
 *.gcno
 *.gcov
