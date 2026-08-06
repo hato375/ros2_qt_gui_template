@@ -109,7 +109,7 @@ source install/setup.bash
 locale charmap
 ros2 topic pub /sample_processor/status yds_interfaces/msg/ComponentStatus \
   "{component_id: '画像処理ノード1', state: 4, error_code: 1001, message: '処理時間が上限に近づいています'}" \
-  --rate 1
+  --qos-reliability reliable --qos-durability transient_local --rate 1
 ```
 
 `locale charmap`が`UTF-8`と表示される環境を使用します。GUIのComponent IDとMessageに日本語が

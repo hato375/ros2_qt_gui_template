@@ -15,6 +15,25 @@
 保証しません。例えば、コンポーネントが`ERROR`を通知し続けている間もメッセージが定期的に届いていれば、
 通信状態は`RECEIVING`です。
 
+### 1.1 状態監視トピックのQoS
+
+QoSはROS 2メッセージの配送方法を定める設定です。状態監視トピックは送受信ともに`Reliable`、
+`Transient Local`を使用します。
+
+- `Reliable`: 一時的なパケット欠落があっても、可能な範囲で再送して確実な配送を試みる
+- `Transient Local`: Publisherが最新状態を保持し、後から起動したSupervisorにも渡す
+
+これは、設備ノードを先に起動してSupervisorを後から起動した場合でも、次のheartbeatを待たずに最新状態を
+表示するためです。`Volatile`は接続後の新しいメッセージだけを扱う設定であり、正式なComponentStatus
+監視トピックには使用しません。実装時は共通の`ComponentStatusPublisher`を使用してください。
+
+QoS設定が一致しないPublisherとは接続できない場合があります。手動確認で`ros2 topic pub`を使う場合は、
+3章の例のように`--qos-reliability reliable --qos-durability transient_local`を指定します。
+
+ROS 2のプロセス内通信最適化は`Transient Local`と併用できません。Supervisorは別プロセスの設備ノードを
+監視する役割であり、この最適化を使用しません。`NodeOptions`でプロセス内通信を有効にした場合は、
+不完全な監視状態で起動を続けず、設定エラーとして起動を中止します。
+
 ## 2. 監視対象の設定
 
 `src/ros2_qt_gui/config/ros2_qt_gui.yaml`へ監視対象を列挙します。
@@ -80,7 +99,8 @@ ros2 launch ros2_qt_gui ros2_qt_gui.launch.py
 source /opt/ros/humble/setup.bash
 source install/setup.bash
 ros2 topic pub /camera/status yds_interfaces/msg/ComponentStatus \
-  "{component_id: camera-1, state: 3, error_code: 0, message: capturing}" --rate 1
+  "{component_id: camera-1, state: 3, error_code: 0, message: capturing}" \
+  --qos-reliability reliable --qos-durability transient_local --rate 1
 ```
 
 さらに別のターミナルからPLC状態を送信します。
@@ -89,7 +109,8 @@ ros2 topic pub /camera/status yds_interfaces/msg/ComponentStatus \
 source /opt/ros/humble/setup.bash
 source install/setup.bash
 ros2 topic pub /plc/status yds_interfaces/msg/ComponentStatus \
-  "{component_id: plc-1, state: 2, error_code: 0, message: connected}" --rate 1
+  "{component_id: plc-1, state: 2, error_code: 0, message: connected}" \
+  --qos-reliability reliable --qos-durability transient_local --rate 1
 ```
 
 GUIにはトピックごとに次の情報が表示されます。

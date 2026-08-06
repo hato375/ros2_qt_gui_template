@@ -200,6 +200,7 @@ Lifecycle Nodeを実装するパッケージは、`yds_ros2`に加えて`rclcpp_
 
 ## 7. QoS
 
-Publisherは`KeepLast(1)`、`Reliable`、`Transient Local`を使用します。監視ノードが同じQoSで
-Subscribeすると、設備ノードより後に起動した場合も、保持された最新状態を受信できます。
+Publisherは`KeepLast(1)`、`Reliable`、`Transient Local`を使用します。Supervisorも
+`Reliable`、`Transient Local`でSubscribeするため、設備ノードより後に起動した場合も、保持された
+最新状態を受信できます。
 定期Publishも行うため、一時的な切断から復旧した後は最新状態を再受信できます。

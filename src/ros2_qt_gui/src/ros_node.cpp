@@ -167,6 +167,10 @@ RosNode::RosNode(
 	  heartbeatTimer_(),
 	  monitoredTopicSubscriptions_(),
 	  topicReceptionStatusTimer_() {
+	if (options.use_intra_process_comms()) {
+		throw std::invalid_argument(
+			"component status monitoring does not support intra-process communications");
+	}
 	validateInterval(
 		"heartbeat_interval_ms",
 		heartbeatIntervalMs_,
@@ -289,7 +293,7 @@ RosNode::RosNode(
 		monitoredTopicSubscriptions_.push_back(
 			create_subscription<yds_interfaces::msg::ComponentStatus>(
 			configuration.statusTopicName.toStdString(),
-			rclcpp::QoS(10),
+			rclcpp::QoS(rclcpp::KeepLast(10)).reliable().transient_local(),
 			[this, index](const yds_interfaces::msg::ComponentStatus::SharedPtr message) {
 				onMonitoredTopic(index, message);
 			}));

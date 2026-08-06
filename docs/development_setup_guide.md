@@ -208,10 +208,13 @@ colcon test --packages-select yds_interfaces yds_ros2 yds_ros2_widgets ros2_qt_g
 colcon test-result --verbose
 ```
 
-ロジック系サンプルを含める場合は、`sample_processor`もテスト対象へ追加します。
+ロジック系サンプルと公開APIテストを含める場合は、`sample_processor`と
+`sample_processor_api_test`もテスト対象へ追加します。
 
 ```bash
-colcon test --packages-select yds_interfaces yds_ros2 yds_ros2_widgets ros2_qt_gui sample_processor
+colcon test --packages-select \
+  yds_interfaces yds_ros2 yds_ros2_widgets ros2_qt_gui \
+  sample_processor sample_processor_api_test
 ```
 
 現在のテストは次を確認します。
@@ -226,6 +229,8 @@ colcon test --packages-select yds_interfaces yds_ros2 yds_ros2_widgets ros2_qt_g
 - 共通の`ComponentStatusNode`が状態変更時と設定周期で最新のコンポーネント状態を通知する
 - 共通の`ComponentStatusPublisher`を通常のROSノードへ組み込める
 - Lifecycle Nodeの状態通知、Inactive中の受信継続、タイムアウト、および復旧をSupervisorまで検証する
+- Lifecycle Nodeを実プロセスで起動し、外部サービスによる遷移、状態通知、および正常終了を検証する
+- インストール済みLifecycle APIを別パッケージから継承・リンクできる
 - 不正なComponentStatusを`UNKNOWN`へ縮退し、品質警告の抑制と復旧を通知する
 - ロジック系サンプルノードが`INITIALIZING`、`READY`、`RUNNING`を通知する
 - Executorを複数回停止しても安全に終了する

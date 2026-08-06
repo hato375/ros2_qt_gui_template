@@ -876,6 +876,21 @@ TEST(RosNodeParameterTest, RejectsInvalidComponentMonitorParameters) {
 	});
 }
 
+TEST(RosNodeParameterTest, RejectsIntraProcessCommunications) {
+	rclcpp::NodeOptions options;
+	options.use_intra_process_comms(true);
+
+	EXPECT_THROW(
+		std::make_shared<ros2qtgui::RosNode>(
+			[](std::uint64_t) {
+			},
+			ros2qtgui::RosNode::ApplicationEventCallback(),
+			ros2qtgui::RosNode::TopicReceptionStatusCallback(),
+			ros2qtgui::RosNode::ComponentStatusCallback(),
+			options),
+		std::invalid_argument);
+}
+
 TEST(ExecutorRunnerIntegrationTest, DeliversHeartbeatAndStopsSafely) {
 	ros2qtgui::RosQtBridge bridge;
 	HeartbeatReceiver receiver;
@@ -899,6 +914,84 @@ TEST(ExecutorRunnerIntegrationTest, DeliversHeartbeatAndStopsSafely) {
 
 	executorRunner.stop();
 	executorRunner.stop();
+}
+
+TEST(ComponentStatusQosIntegrationTest, ReceivesRetainedStatusAfterSupervisorStarts) {
+	using namespace std::chrono_literals;
+
+	auto publisherNode = std::make_shared<rclcpp::Node>("late_join_status_publisher");
+	yds::ros2::ComponentStatusPublisher statusPublisher(
+		*publisherNode,
+		{
+			QStringLiteral("late-join-component-1"),
+			QStringLiteral("late_join/status"),
+			600000ms});
+	ASSERT_TRUE(statusPublisher.setStatus(
+		yds::ros2::ComponentState::kReady,
+		0,
+		QStringLiteral("Ready before supervisor startup")));
+
+	rclcpp::NodeOptions options;
+	options.parameter_overrides({
+		rclcpp::Parameter("gui_status_check_interval_ms", 100),
+		rclcpp::Parameter(
+			"component_monitor_names",
+			std::vector<std::string>{"late_join"}),
+		rclcpp::Parameter("component_monitors.late_join.enabled", true),
+		rclcpp::Parameter(
+			"component_monitors.late_join.status_topic",
+			"late_join/status"),
+		rclcpp::Parameter("component_monitors.late_join.timeout_ms", 1000),
+	});
+
+	ros2qtgui::RosQtBridge bridge;
+	TopicReceptionStatusReceiver receptionReceiver;
+	ComponentStatusReceiver componentReceiver;
+	QObject::connect(
+		&bridge,
+		&ros2qtgui::RosQtBridge::topicReceptionStatusUpdated,
+		&receptionReceiver,
+		&TopicReceptionStatusReceiver::receiveTopicReceptionStatus,
+		Qt::QueuedConnection);
+	QObject::connect(
+		&bridge,
+		&ros2qtgui::RosQtBridge::componentStatusUpdated,
+		&componentReceiver,
+		&ComponentStatusReceiver::receiveComponentStatus,
+		Qt::QueuedConnection);
+
+	auto supervisorNode = std::make_shared<ros2qtgui::RosNode>(
+		[](std::uint64_t) {
+		},
+		ros2qtgui::RosNode::ApplicationEventCallback(),
+		[&bridge](const yds::ros2::TopicReceptionStatus& status) {
+			bridge.notifyTopicReceptionStatus(status);
+		},
+		[&bridge](const yds::ros2::ComponentStatus& status) {
+			bridge.notifyComponentStatus(status);
+		},
+		options);
+	yds::ros2::ExecutorRunner supervisorExecutor(supervisorNode);
+
+	const QString topicName = QStringLiteral("late_join/status");
+	ASSERT_TRUE(waitFor([&]() {
+		return receptionReceiver.hasStatus(topicName) &&
+			componentReceiver.hasStatus(topicName);
+	}, 1500));
+	EXPECT_EQ(
+		receptionReceiver.status(topicName).state,
+		yds::ros2::TopicReceptionState::kReceiving);
+	EXPECT_EQ(
+		componentReceiver.status(topicName).state,
+		yds::ros2::ComponentState::kReady);
+	EXPECT_EQ(
+		componentReceiver.status(topicName).componentId,
+		QStringLiteral("late-join-component-1"));
+	EXPECT_EQ(
+		componentReceiver.status(topicName).message,
+		QStringLiteral("Ready before supervisor startup"));
+
+	supervisorExecutor.stop();
 }
 
 TEST(ComponentStatusQualityIntegrationTest, DegradesInvalidValuesAndReportsRecovery) {
@@ -956,7 +1049,9 @@ TEST(ComponentStatusQualityIntegrationTest, DegradesInvalidValuesAndReportsRecov
 		},
 		options);
 	const auto publisher =
-		node->create_publisher<yds_interfaces::msg::ComponentStatus>("quality/status", 10);
+		node->create_publisher<yds_interfaces::msg::ComponentStatus>(
+			"quality/status",
+			rclcpp::QoS(rclcpp::KeepLast(10)).reliable().transient_local());
 	yds::ros2::ExecutorRunner executorRunner(node);
 	const QString topicName = QStringLiteral("quality/status");
 	std::uint64_t expectedReceivedCount = 0;
@@ -1145,7 +1240,6 @@ TEST(TopicReceptionIntegrationTest, ReportsIndividualTimeoutAndRecovery) {
 	using namespace std::chrono_literals;
 
 	rclcpp::NodeOptions options;
-	options.use_intra_process_comms(true);
 	options.parameter_overrides({
 		rclcpp::Parameter("component_monitors.camera.timeout_ms", 500),
 		rclcpp::Parameter("component_monitors.plc.timeout_ms", 1200),
@@ -1188,9 +1282,13 @@ TEST(TopicReceptionIntegrationTest, ReportsIndividualTimeoutAndRecovery) {
 		},
 		options);
 	auto cameraPublisher =
-		node->create_publisher<yds_interfaces::msg::ComponentStatus>("camera/status", 10);
+		node->create_publisher<yds_interfaces::msg::ComponentStatus>(
+			"camera/status",
+			rclcpp::QoS(rclcpp::KeepLast(10)).reliable().transient_local());
 	auto plcPublisher =
-		node->create_publisher<yds_interfaces::msg::ComponentStatus>("plc/status", 10);
+		node->create_publisher<yds_interfaces::msg::ComponentStatus>(
+			"plc/status",
+			rclcpp::QoS(rclcpp::KeepLast(10)).reliable().transient_local());
 	auto plcKeepAliveTimer = node->create_wall_timer(100ms, [plcPublisher]() {
 		yds_interfaces::msg::ComponentStatus plcMessage;
 		plcMessage.component_id = "plc-1";
