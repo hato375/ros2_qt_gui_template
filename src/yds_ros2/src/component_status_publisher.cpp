@@ -5,11 +5,13 @@
 
 #include <QByteArray>
 #include <QDateTime>
+#include <QStringList>
 
 #include <rclcpp/create_publisher.hpp>
 #include <rclcpp/create_timer.hpp>
 
 #include <yds/ros2/component_status_conversion.h>
+#include <yds/ros2/component_status_validation.h>
 
 namespace {
 
@@ -36,6 +38,12 @@ ComponentStatusPublisher::ComponentStatusPublisher(
 		  0,
 		  QString(),
 		  QDateTime()},
+	  lastWarningState_(ComponentState::kUnknown),
+	  lastWarningErrorCode_(0),
+	  hasLastValidationWarning_(false),
+	  lastUnexpectedErrorCode_(false),
+	  lastMissingErrorCode_(false),
+	  lastMissingMessage_(false),
 	  publisher_(),
 	  timer_() {
 	if (configuration_.componentId.trimmed().isEmpty()) {
@@ -84,11 +92,58 @@ bool ComponentStatusPublisher::setStatus(
 	qint32 errorCode,
 	const QString& message) noexcept {
 	try {
+		const ComponentStatusValidationResult validation =
+			validateComponentStatus(state, errorCode, message);
+		if (!validation.validState) {
+			RCLCPP_ERROR(
+				logger_,
+				"Rejected undefined component state: value=%d",
+				static_cast<int>(state));
+			return false;
+		}
+
+		bool logConsistencyWarning = false;
 		{
 			std::lock_guard<std::mutex> lock(statusMutex_);
+			if (validation.hasConsistencyWarning()) {
+				logConsistencyWarning = !hasLastValidationWarning_ ||
+					lastWarningState_ != state ||
+					lastWarningErrorCode_ != errorCode ||
+					lastUnexpectedErrorCode_ != validation.unexpectedErrorCode ||
+					lastMissingErrorCode_ != validation.missingErrorCode ||
+					lastMissingMessage_ != validation.missingMessage;
+				hasLastValidationWarning_ = true;
+				lastWarningState_ = state;
+				lastWarningErrorCode_ = errorCode;
+				lastUnexpectedErrorCode_ = validation.unexpectedErrorCode;
+				lastMissingErrorCode_ = validation.missingErrorCode;
+				lastMissingMessage_ = validation.missingMessage;
+			} else {
+				hasLastValidationWarning_ = false;
+			}
 			status_.state = state;
 			status_.errorCode = errorCode;
 			status_.message = message;
+		}
+		if (logConsistencyWarning) {
+			QStringList reasons;
+			if (validation.unexpectedErrorCode) {
+				reasons.push_back(QStringLiteral("normal state has a non-zero error code"));
+			}
+			if (validation.missingErrorCode) {
+				reasons.push_back(QStringLiteral("abnormal state has error code zero"));
+			}
+			if (validation.missingMessage) {
+				reasons.push_back(QStringLiteral("abnormal state has an empty message"));
+			}
+			const QByteArray reasonsUtf8 = reasons.join(QStringLiteral(", ")).toUtf8();
+			const QByteArray stateTextUtf8 = componentStateText(state).toUtf8();
+			RCLCPP_WARN(
+				logger_,
+				"Publishing inconsistent component status: state=%s, error_code=%ld, reasons=%s",
+				stateTextUtf8.constData(),
+				static_cast<long>(errorCode),
+				reasonsUtf8.constData());
 		}
 		return publishStatus();
 	} catch (const std::exception& exception) {

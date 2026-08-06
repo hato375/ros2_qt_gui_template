@@ -105,6 +105,23 @@ TEST(ComponentStatusPublisherTest, RejectsInvalidConfiguration) {
 		std::out_of_range);
 }
 
+TEST(ComponentStatusPublisherTest, RejectsUndefinedStateWithoutChangingCurrentStatus) {
+	auto node = std::make_shared<rclcpp::Node>("component_status_validation_test");
+	yds::ros2::ComponentStatusPublisher publisher(
+		*node,
+		{
+			QStringLiteral("validation-test"),
+			QStringLiteral("validation/status"),
+			1000ms});
+
+	EXPECT_FALSE(publisher.setStatus(
+		static_cast<yds::ros2::ComponentState>(99),
+		123,
+		QStringLiteral("Invalid state")));
+	EXPECT_EQ(publisher.status().state, yds::ros2::ComponentState::kInitializing);
+	EXPECT_EQ(publisher.status().errorCode, 0);
+}
+
 TEST(ComponentStatusPublisherTest, PublishesHeartbeatWhileLifecycleNodeIsInactive) {
 	rclcpp::NodeOptions options;
 	options.parameter_overrides({

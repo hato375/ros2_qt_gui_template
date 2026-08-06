@@ -90,6 +90,12 @@ private:
 	ComponentStatusPublisherConfiguration configuration_;
 	mutable std::mutex statusMutex_;
 	ComponentStatus status_;
+	ComponentState lastWarningState_;
+	qint32 lastWarningErrorCode_;
+	bool hasLastValidationWarning_;
+	bool lastUnexpectedErrorCode_;
+	bool lastMissingErrorCode_;
+	bool lastMissingMessage_;
 	rclcpp::Publisher<yds_interfaces::msg::ComponentStatus>::SharedPtr publisher_;
 	rclcpp::TimerBase::SharedPtr timer_;
 };

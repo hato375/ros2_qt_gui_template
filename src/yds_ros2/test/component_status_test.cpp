@@ -2,6 +2,7 @@
 
 #include <yds/ros2/component_status.h>
 #include <yds/ros2/component_status_conversion.h>
+#include <yds/ros2/component_status_validation.h>
 
 TEST(ComponentStatusTest, ConvertsAllStatesToText) {
 	EXPECT_EQ(
@@ -116,4 +117,55 @@ TEST(ComponentStatusConversionTest, ConvertsComponentStatusInBothDirections) {
 	EXPECT_EQ(
 		convertedStatus.timestamp.toMSecsSinceEpoch(),
 		status.timestamp.toMSecsSinceEpoch());
+}
+
+TEST(ComponentStatusValidationTest, AcceptsConsistentAndUnknownStatuses) {
+	const auto running = yds::ros2::validateComponentStatus(
+		yds::ros2::ComponentState::kRunning,
+		0,
+		QStringLiteral("Processing"));
+	EXPECT_TRUE(running.validState);
+	EXPECT_FALSE(running.hasConsistencyWarning());
+
+	const auto error = yds::ros2::validateComponentStatus(
+		yds::ros2::ComponentState::kError,
+		2001,
+		QStringLiteral("Processing failed"));
+	EXPECT_TRUE(error.validState);
+	EXPECT_FALSE(error.hasConsistencyWarning());
+
+	const auto unknown = yds::ros2::validateComponentStatus(
+		yds::ros2::ComponentState::kUnknown,
+		-1,
+		QString());
+	EXPECT_TRUE(unknown.validState);
+	EXPECT_FALSE(unknown.hasConsistencyWarning());
+}
+
+TEST(ComponentStatusValidationTest, ReportsSemanticInconsistencies) {
+	const auto running = yds::ros2::validateComponentStatus(
+		yds::ros2::ComponentState::kRunning,
+		12,
+		QStringLiteral("Processing"));
+	EXPECT_TRUE(running.validState);
+	EXPECT_TRUE(running.unexpectedErrorCode);
+	EXPECT_FALSE(running.missingErrorCode);
+	EXPECT_FALSE(running.missingMessage);
+
+	const auto critical = yds::ros2::validateComponentStatus(
+		yds::ros2::ComponentState::kCritical,
+		0,
+		QStringLiteral("  "));
+	EXPECT_TRUE(critical.validState);
+	EXPECT_FALSE(critical.unexpectedErrorCode);
+	EXPECT_TRUE(critical.missingErrorCode);
+	EXPECT_TRUE(critical.missingMessage);
+}
+
+TEST(ComponentStatusValidationTest, RejectsUndefinedState) {
+	const auto result = yds::ros2::validateComponentStatus(
+		static_cast<yds::ros2::ComponentState>(99),
+		0,
+		QString());
+	EXPECT_FALSE(result.validState);
 }

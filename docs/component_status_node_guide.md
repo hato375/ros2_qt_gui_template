@@ -125,6 +125,33 @@ setComponentStatus(yds::ros2::ComponentState::kCritical, 2001, QStringLiteral("E
 setComponentStatus(yds::ros2::ComponentState::kReady, 0, QString());
 ```
 
+### 5.1 値の検証ポリシー
+
+`ComponentStatusPublisher`は定義外の`ComponentState`を拒否し、現在状態を変更せず`false`を返します。
+一方、次の意味的な不整合は警告ログを出したうえで、指定された値をそのままPublishします。
+
+- `INITIALIZING`、`READY`、`RUNNING`、`STOPPED`で`errorCode`が0以外
+- `WARNING`、`ERROR`、`CRITICAL`で`errorCode`が0
+- `WARNING`、`ERROR`、`CRITICAL`でメッセージが空または空白だけ
+
+設備固有コードでは負数やコード0が有効な場合もあるため、共通層では値を自動修正しません。同じ内容の
+不整合が繰り返し設定された場合は警告ログを抑制し、不整合の内容が変化したときに再度記録します。
+`UNKNOWN`は原因を特定できない状態を保持するため、エラーコードとメッセージの組み合わせを制限しません。
+
+ROS通信に依存せず事前確認したい場合は、`validateComponentStatus()`を利用できます。
+
+```cpp
+#include <yds/ros2/component_status_validation.h>
+
+const auto validation = yds::ros2::validateComponentStatus(state, errorCode, message);
+if (!validation.validState) {
+	// 定義外状態として処理する
+}
+if (validation.hasConsistencyWarning()) {
+	// 案件固有ルールと照合する
+}
+```
+
 ## 6. Lifecycle Nodeへ組み込む
 
 Lifecycle Nodeでは、`ComponentStatusNode`を継承せず、ROS 2標準の

@@ -17,6 +17,7 @@ add_library(${PROJECT_NAME}
 	src/component_status_node.cpp
 	src/component_status_parameters.cpp
 	src/component_status_publisher.cpp
+	src/component_status_validation.cpp
 	src/executor_runner.cpp
 	src/topic_reception_monitor.cpp
 )

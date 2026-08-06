@@ -79,6 +79,8 @@ Publisherへ委譲します。別の基底クラスを持つノードは、`Comp
 Inactive中も死活確認のため定期通知を継続します。Lifecycle状態からコンポーネント状態への自動変換は
 行わず、設備や機能の実態に応じてLifecycleコールバックから明示的に状態を設定します。両方のノードで
 同じROSパラメータを使用する場合は、`declareComponentStatusPublisherParameters()`で設定を解決します。
+ComponentStatusの定義外状態はPublisherで拒否します。状態とエラーコード、メッセージの意味的な不整合は
+警告しますが、設備固有のコード体系を壊さないよう共通層では自動修正しません。
 物理設備を持たないロジック系ノードへの組み込み例は、`sample_processor`パッケージと
 `docs/sample_processor_guide.md`を参照してください。
 
