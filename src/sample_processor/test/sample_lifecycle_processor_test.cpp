@@ -25,9 +25,16 @@ public:
 
 protected:
 	bool configureProcessor(QString& errorMessage) override {
+		if (!failNextConfiguration_) {
+			return true;
+		}
+		failNextConfiguration_ = false;
 		errorMessage = QStringLiteral("Camera connection failed");
 		return false;
 	}
+
+private:
+	bool failNextConfiguration_ = true;
 };
 
 class ActivateFailureNode final
@@ -37,9 +44,16 @@ public:
 
 protected:
 	bool activateProcessor(QString& errorMessage) override {
+		if (!failNextActivation_) {
+			return true;
+		}
+		failNextActivation_ = false;
 		errorMessage = QStringLiteral("Processor start failed");
 		return false;
 	}
+
+private:
+	bool failNextActivation_ = true;
 };
 
 TEST(SampleLifecycleProcessorNodeTest, RejectsInvalidProcessingInterval) {
@@ -189,15 +203,25 @@ TEST(SampleLifecycleProcessorNodeTest, ReportsConfigureFailureAsComponentError) 
 	executor.cancel();
 	executorThread.join();
 
-	std::lock_guard<std::mutex> lock(receivedMutex);
-	EXPECT_GE(receivedCount, 3U);
-	EXPECT_EQ(latestMessage.state, yds_interfaces::msg::ComponentStatus::STATE_ERROR);
-	EXPECT_EQ(latestMessage.error_code, 9101);
-	EXPECT_EQ(latestMessage.message, "Camera connection failed");
-	EXPECT_EQ(
-		receptionMonitor.status().state,
-		yds::ros2::TopicReceptionState::kReceiving);
-	EXPECT_EQ(receptionMonitor.checkTimeout(), yds::ros2::TopicReceptionTransition::kNone);
+	{
+		std::lock_guard<std::mutex> lock(receivedMutex);
+		EXPECT_GE(receivedCount, 3U);
+		EXPECT_EQ(latestMessage.state, yds_interfaces::msg::ComponentStatus::STATE_ERROR);
+		EXPECT_EQ(latestMessage.error_code, 9101);
+		EXPECT_EQ(latestMessage.message, "Camera connection failed");
+		EXPECT_EQ(
+			receptionMonitor.status().state,
+			yds::ros2::TopicReceptionState::kReceiving);
+		EXPECT_EQ(
+			receptionMonitor.checkTimeout(),
+			yds::ros2::TopicReceptionTransition::kNone);
+	}
+
+	node->configure();
+	EXPECT_EQ(node->get_current_state().label(), "inactive");
+	EXPECT_EQ(node->componentStatus().state, yds::ros2::ComponentState::kReady);
+	EXPECT_EQ(node->componentStatus().errorCode, 0);
+	EXPECT_EQ(node->componentStatus().message, QStringLiteral("Configuration completed"));
 }
 
 TEST(SampleLifecycleProcessorNodeTest, ReportsActivateFailureAsComponentError) {
@@ -212,6 +236,16 @@ TEST(SampleLifecycleProcessorNodeTest, ReportsActivateFailureAsComponentError) {
 	EXPECT_EQ(status.state, yds::ros2::ComponentState::kError);
 	EXPECT_EQ(status.errorCode, 9102);
 	EXPECT_EQ(status.message, QStringLiteral("Processor start failed"));
+
+	node->configure();
+	ASSERT_EQ(node->get_current_state().label(), "inactive");
+	EXPECT_EQ(node->componentStatus().state, yds::ros2::ComponentState::kReady);
+	EXPECT_EQ(node->componentStatus().errorCode, 0);
+	node->activate();
+	EXPECT_EQ(node->get_current_state().label(), "active");
+	EXPECT_EQ(node->componentStatus().state, yds::ros2::ComponentState::kRunning);
+	EXPECT_EQ(node->componentStatus().errorCode, 0);
+	EXPECT_EQ(node->componentStatus().message, QStringLiteral("Processing started"));
 }
 
 TEST(SampleLifecycleProcessorNodeTest, UpdatesStatusForCleanupAndShutdown) {

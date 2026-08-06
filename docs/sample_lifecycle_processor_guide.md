@@ -105,5 +105,10 @@ bool CameraProcessorNode::configureProcessor(QString& errorMessage) {
 状態通知自体に失敗した場合もLifecycleコールバックは`ERROR`を返します。error処理で`ERROR`通知を
 再試行し、それにも失敗した場合は`FAILURE`を返してLifecycle状態を`finalized`へ遷移させます。
 
+error処理が成功するとLifecycle状態は`unconfigured`へ戻ります。失敗原因を取り除いた後にconfigureを
+再実行するとComponentStatusは`READY`となり、エラーコードとエラーメッセージがクリアされます。
+activate失敗後も、configureから再実行して`READY`、`RUNNING`の順に復旧します。自動復旧を行う場合は、
+無制限に再試行せず、回数上限、待機時間、および安全条件を設備要件に合わせて定義してください。
+
 ComponentStatus通知は安全停止を代行しません。`ERROR`や`CRITICAL`を通知する処理とは別に、必要な停止、
 リトライ、復旧処理を実装します。
