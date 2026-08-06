@@ -26,6 +26,18 @@
 Lifecycleサンプルの遷移エラー用とし、`9001`を汎用遷移エラー、`9101`～`9105`を各設備固有フックへ
 割り当てています。派生ノードではこれらの値を別用途へ流用しないでください。
 
+別パッケージから派生ノードを実装する場合は、`find_package(sample_processor REQUIRED)`を実行し、
+対象へ`sample_processor::sample_lifecycle_processor_node`をリンクします。これによりLifecycleノード、
+エラーコード、および必要な依存ライブラリのinclude・link設定が引き継がれます。
+
+```cmake
+find_package(sample_processor REQUIRED)
+target_link_libraries(
+	my_lifecycle_processor
+	sample_processor::sample_lifecycle_processor_node
+)
+```
+
 ComponentStatusの定期通知は処理タイマーとは別に動作します。このため、Lifecycle NodeがInactiveで
 処理を停止していてもheartbeatは継続し、Supervisorは正常なInactive状態と通信断を区別できます。
 

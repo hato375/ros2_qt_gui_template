@@ -123,7 +123,7 @@ ament_export_dependencies(
 	rclcpp
 	rclcpp_lifecycle
 	std_srvs
-	Qt5
+	Qt5Core
 	yds_interfaces
 	yds_ros2
 )
