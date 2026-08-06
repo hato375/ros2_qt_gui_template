@@ -17,6 +17,9 @@ namespace {
 
 constexpr std::int64_t kMinimumIntervalMs = 100;
 constexpr std::int64_t kMaximumIntervalMs = 600000;
+constexpr qint32 kLifecycleTransitionErrorCode = 9001;
+constexpr qint32 kProcessorConfigurationErrorCode = 9101;
+constexpr qint32 kProcessorActivationErrorCode = 9102;
 
 rcl_interfaces::msg::ParameterDescriptor processingIntervalDescriptor() {
 	rcl_interfaces::msg::ParameterDescriptor descriptor;
@@ -94,12 +97,29 @@ SampleLifecycleProcessorNode::CallbackReturn SampleLifecycleProcessorNode::on_co
 	transitionErrorCode_ = 0;
 	transitionErrorMessage_.clear();
 	QString errorMessage;
-	if (!configureProcessor(errorMessage)) {
-		transitionErrorCode_ = 9101;
-		transitionErrorMessage_ = errorMessage.trimmed().isEmpty()
-			? QStringLiteral("Processor configuration failed")
-			: errorMessage;
-		RCLCPP_ERROR(get_logger(), "Lifecycle sample processor configuration failed");
+	try {
+		if (!configureProcessor(errorMessage)) {
+			transitionErrorCode_ = kProcessorConfigurationErrorCode;
+			transitionErrorMessage_ = errorMessage.trimmed().isEmpty()
+				? QStringLiteral("Processor configuration failed")
+				: errorMessage;
+			RCLCPP_ERROR(get_logger(), "Lifecycle sample processor configuration failed");
+			return CallbackReturn::ERROR;
+		}
+	} catch (const std::exception& exception) {
+		transitionErrorCode_ = kProcessorConfigurationErrorCode;
+		transitionErrorMessage_ = QStringLiteral("Processor configuration raised an exception");
+		RCLCPP_ERROR(
+			get_logger(),
+			"Lifecycle sample processor configuration raised an exception: %s",
+			exception.what());
+		return CallbackReturn::ERROR;
+	} catch (...) {
+		transitionErrorCode_ = kProcessorConfigurationErrorCode;
+		transitionErrorMessage_ = QStringLiteral("Processor configuration raised an exception");
+		RCLCPP_ERROR(
+			get_logger(),
+			"Lifecycle sample processor configuration raised an unknown exception");
 		return CallbackReturn::ERROR;
 	}
 	return updateComponentStatus(
@@ -129,12 +149,29 @@ SampleLifecycleProcessorNode::CallbackReturn SampleLifecycleProcessorNode::on_ac
 	transitionErrorCode_ = 0;
 	transitionErrorMessage_.clear();
 	QString errorMessage;
-	if (!activateProcessor(errorMessage)) {
-		transitionErrorCode_ = 9102;
-		transitionErrorMessage_ = errorMessage.trimmed().isEmpty()
-			? QStringLiteral("Processor activation failed")
-			: errorMessage;
-		RCLCPP_ERROR(get_logger(), "Lifecycle sample processor activation failed");
+	try {
+		if (!activateProcessor(errorMessage)) {
+			transitionErrorCode_ = kProcessorActivationErrorCode;
+			transitionErrorMessage_ = errorMessage.trimmed().isEmpty()
+				? QStringLiteral("Processor activation failed")
+				: errorMessage;
+			RCLCPP_ERROR(get_logger(), "Lifecycle sample processor activation failed");
+			return CallbackReturn::ERROR;
+		}
+	} catch (const std::exception& exception) {
+		transitionErrorCode_ = kProcessorActivationErrorCode;
+		transitionErrorMessage_ = QStringLiteral("Processor activation raised an exception");
+		RCLCPP_ERROR(
+			get_logger(),
+			"Lifecycle sample processor activation raised an exception: %s",
+			exception.what());
+		return CallbackReturn::ERROR;
+	} catch (...) {
+		transitionErrorCode_ = kProcessorActivationErrorCode;
+		transitionErrorMessage_ = QStringLiteral("Processor activation raised an exception");
+		RCLCPP_ERROR(
+			get_logger(),
+			"Lifecycle sample processor activation raised an unknown exception");
 		return CallbackReturn::ERROR;
 	}
 	if (!updateComponentStatus(
@@ -175,7 +212,9 @@ SampleLifecycleProcessorNode::CallbackReturn SampleLifecycleProcessorNode::on_er
 	const rclcpp_lifecycle::State&) {
 	processingTimer_->cancel();
 	RCLCPP_ERROR(get_logger(), "Lifecycle sample processor transition failed");
-	const qint32 errorCode = transitionErrorCode_ == 0 ? 9001 : transitionErrorCode_;
+	const qint32 errorCode = transitionErrorCode_ == 0
+		? kLifecycleTransitionErrorCode
+		: transitionErrorCode_;
 	const QString errorMessage = transitionErrorMessage_.isEmpty()
 		? QStringLiteral("Lifecycle transition failed")
 		: transitionErrorMessage_;

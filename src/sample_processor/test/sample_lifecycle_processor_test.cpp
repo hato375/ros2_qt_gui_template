@@ -2,6 +2,7 @@
 #include <chrono>
 #include <memory>
 #include <mutex>
+#include <stdexcept>
 #include <thread>
 
 #include <gtest/gtest.h>
@@ -54,6 +55,42 @@ protected:
 
 private:
 	bool failNextActivation_ = true;
+};
+
+class ConfigureExceptionNode final
+	: public sampleprocessor::SampleLifecycleProcessorNode {
+public:
+	using SampleLifecycleProcessorNode::SampleLifecycleProcessorNode;
+
+protected:
+	bool configureProcessor(QString&) override {
+		if (throwNextConfiguration_) {
+			throwNextConfiguration_ = false;
+			throw std::runtime_error("camera driver internal path: connection failed");
+		}
+		return true;
+	}
+
+private:
+	bool throwNextConfiguration_ = true;
+};
+
+class ActivateUnknownExceptionNode final
+	: public sampleprocessor::SampleLifecycleProcessorNode {
+public:
+	using SampleLifecycleProcessorNode::SampleLifecycleProcessorNode;
+
+protected:
+	bool activateProcessor(QString&) override {
+		if (throwNextActivation_) {
+			throwNextActivation_ = false;
+			throw 1;
+		}
+		return true;
+	}
+
+private:
+	bool throwNextActivation_ = true;
 };
 
 TEST(SampleLifecycleProcessorNodeTest, RejectsInvalidProcessingInterval) {
@@ -246,6 +283,45 @@ TEST(SampleLifecycleProcessorNodeTest, ReportsActivateFailureAsComponentError) {
 	EXPECT_EQ(node->componentStatus().state, yds::ros2::ComponentState::kRunning);
 	EXPECT_EQ(node->componentStatus().errorCode, 0);
 	EXPECT_EQ(node->componentStatus().message, QStringLiteral("Processing started"));
+}
+
+TEST(SampleLifecycleProcessorNodeTest, HandlesConfigureStandardExceptionAndRecovers) {
+	auto node = std::make_shared<ConfigureExceptionNode>();
+
+	EXPECT_NO_THROW(node->configure());
+	EXPECT_EQ(node->get_current_state().label(), "unconfigured");
+	EXPECT_EQ(node->componentStatus().state, yds::ros2::ComponentState::kError);
+	EXPECT_EQ(node->componentStatus().errorCode, 9101);
+	EXPECT_EQ(
+		node->componentStatus().message,
+		QStringLiteral("Processor configuration raised an exception"));
+	EXPECT_FALSE(node->componentStatus().message.contains(QStringLiteral("internal path")));
+
+	node->configure();
+	EXPECT_EQ(node->get_current_state().label(), "inactive");
+	EXPECT_EQ(node->componentStatus().state, yds::ros2::ComponentState::kReady);
+	EXPECT_EQ(node->componentStatus().errorCode, 0);
+}
+
+TEST(SampleLifecycleProcessorNodeTest, HandlesActivateUnknownExceptionAndRecovers) {
+	auto node = std::make_shared<ActivateUnknownExceptionNode>();
+
+	node->configure();
+	ASSERT_EQ(node->get_current_state().label(), "inactive");
+	EXPECT_NO_THROW(node->activate());
+	EXPECT_EQ(node->get_current_state().label(), "unconfigured");
+	EXPECT_EQ(node->componentStatus().state, yds::ros2::ComponentState::kError);
+	EXPECT_EQ(node->componentStatus().errorCode, 9102);
+	EXPECT_EQ(
+		node->componentStatus().message,
+		QStringLiteral("Processor activation raised an exception"));
+
+	node->configure();
+	ASSERT_EQ(node->get_current_state().label(), "inactive");
+	node->activate();
+	EXPECT_EQ(node->get_current_state().label(), "active");
+	EXPECT_EQ(node->componentStatus().state, yds::ros2::ComponentState::kRunning);
+	EXPECT_EQ(node->componentStatus().errorCode, 0);
 }
 
 TEST(SampleLifecycleProcessorNodeTest, UpdatesStatusForCleanupAndShutdown) {

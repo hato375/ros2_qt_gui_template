@@ -110,5 +110,10 @@ error処理が成功するとLifecycle状態は`unconfigured`へ戻ります。�
 activate失敗後も、configureから再実行して`READY`、`RUNNING`の順に復旧します。自動復旧を行う場合は、
 無制限に再試行せず、回数上限、待機時間、および安全条件を設備要件に合わせて定義してください。
 
+`configureProcessor()`または`activateProcessor()`から例外が送出された場合は、Lifecycleノードが
+`std::exception`とその他の例外を境界で捕捉します。例外の詳細は原因調査用としてROSログに記録し、
+ComponentStatusには内部情報を含まない定型メッセージを設定します。エラーコードは処理が`false`を
+返した場合と同じく、configureでは`9101`、activateでは`9102`です。例外後の復旧手順も同じです。
+
 ComponentStatus通知は安全停止を代行しません。`ERROR`や`CRITICAL`を通知する処理とは別に、必要な停止、
 リトライ、復旧処理を実装します。
