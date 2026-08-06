@@ -89,7 +89,8 @@ Lifecycle Nodeで同じパラメータ構造を利用できます。
 `SampleLifecycleProcessorNode`を派生させ、設備固有の初期化処理を`configureProcessor()`、処理開始を
 `activateProcessor()`へ実装できます。成功時は`true`を返します。失敗時は`errorMessage`へ理由を設定して
 `false`を返すと、Lifecycle遷移はerror処理を経て`unconfigured`へ戻り、ComponentStatusは
-`ERROR`になります。状態通知のheartbeatはその後も継続します。
+`ERROR`になります。状態通知のheartbeatはその後も継続するため、SupervisorではComponent stateが
+`ERROR`、Communicationが`RECEIVING`になります。
 
 ```cpp
 bool CameraProcessorNode::configureProcessor(QString& errorMessage) {

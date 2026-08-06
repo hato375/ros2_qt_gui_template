@@ -12,6 +12,7 @@
 
 #include <sample_processor/sample_lifecycle_processor_node.h>
 #include <yds/ros2/component_status.h>
+#include <yds/ros2/topic_reception_monitor.h>
 
 namespace {
 
@@ -133,15 +134,70 @@ TEST(SampleLifecycleProcessorNodeTest, ProcessesOnlyWhileActiveAndPublishesWhile
 }
 
 TEST(SampleLifecycleProcessorNodeTest, ReportsConfigureFailureAsComponentError) {
-	auto node = std::make_shared<ConfigureFailureNode>();
+	rclcpp::NodeOptions options;
+	options.parameter_overrides({
+		rclcpp::Parameter(
+			"component_status.status_topic",
+			"sample_lifecycle_processor_error_test/status"),
+		rclcpp::Parameter("component_status.publish_interval_ms", 100),
+	});
+	auto node = std::make_shared<ConfigureFailureNode>(options);
+	auto receiverNode = std::make_shared<rclcpp::Node>(
+		"lifecycle_processor_error_receiver_test");
+	yds::ros2::TopicReceptionMonitor receptionMonitor(
+		QStringLiteral("sample_lifecycle_processor_error_test/status"),
+		250ms);
+	std::mutex receivedMutex;
+	yds_interfaces::msg::ComponentStatus latestMessage;
+	std::uint64_t receivedCount = 0;
+	const auto subscription =
+		receiverNode->create_subscription<yds_interfaces::msg::ComponentStatus>(
+			"sample_lifecycle_processor_error_test/status",
+			rclcpp::QoS(rclcpp::KeepLast(1)).reliable().transient_local(),
+			[&](const yds_interfaces::msg::ComponentStatus::SharedPtr message) {
+				std::lock_guard<std::mutex> lock(receivedMutex);
+				latestMessage = *message;
+				++receivedCount;
+				receptionMonitor.recordReception(QString::fromStdString(message->message));
+			});
+	ASSERT_NE(subscription, nullptr);
 
 	node->configure();
-
 	EXPECT_EQ(node->get_current_state().label(), "unconfigured");
 	const yds::ros2::ComponentStatus status = node->componentStatus();
 	EXPECT_EQ(status.state, yds::ros2::ComponentState::kError);
 	EXPECT_EQ(status.errorCode, 9101);
 	EXPECT_EQ(status.message, QStringLiteral("Camera connection failed"));
+
+	rclcpp::executors::SingleThreadedExecutor executor;
+	executor.add_node(node->get_node_base_interface());
+	executor.add_node(receiverNode);
+	std::thread executorThread([&executor]() {
+		executor.spin();
+	});
+
+	const auto heartbeatDeadline = std::chrono::steady_clock::now() + 2s;
+	while (std::chrono::steady_clock::now() < heartbeatDeadline) {
+		{
+			std::lock_guard<std::mutex> lock(receivedMutex);
+			if (receivedCount >= 3) {
+				break;
+			}
+		}
+		std::this_thread::sleep_for(10ms);
+	}
+	executor.cancel();
+	executorThread.join();
+
+	std::lock_guard<std::mutex> lock(receivedMutex);
+	EXPECT_GE(receivedCount, 3U);
+	EXPECT_EQ(latestMessage.state, yds_interfaces::msg::ComponentStatus::STATE_ERROR);
+	EXPECT_EQ(latestMessage.error_code, 9101);
+	EXPECT_EQ(latestMessage.message, "Camera connection failed");
+	EXPECT_EQ(
+		receptionMonitor.status().state,
+		yds::ros2::TopicReceptionState::kReceiving);
+	EXPECT_EQ(receptionMonitor.checkTimeout(), yds::ros2::TopicReceptionTransition::kNone);
 }
 
 TEST(SampleLifecycleProcessorNodeTest, ReportsActivateFailureAsComponentError) {
