@@ -26,6 +26,8 @@ struct ComponentMonitorConfiguration {
 	QString displayName;
 	/// @brief 購読するROSトピック名
 	QString statusTopicName;
+	/// @brief 期待するコンポーネントID。空文字の場合は照合しない
+	QString expectedComponentId;
 	/// @brief 受信タイムアウト時間（ミリ秒）
 	std::int64_t timeoutMs;
 	/// @brief 許容する状態生成時刻の古さ。0は検証無効

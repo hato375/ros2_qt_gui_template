@@ -676,6 +676,7 @@ TEST(RosNodeParameterTest, UsesDefaultValues) {
 	EXPECT_EQ(configurations[0].name, QStringLiteral("camera"));
 	EXPECT_EQ(configurations[0].displayName, QStringLiteral("camera"));
 	EXPECT_EQ(configurations[0].statusTopicName, QStringLiteral("camera/status"));
+	EXPECT_TRUE(configurations[0].expectedComponentId.isEmpty());
 	EXPECT_EQ(configurations[0].timeoutMs, 3000);
 	EXPECT_EQ(configurations[0].maximumStatusAgeMs, 0);
 	EXPECT_EQ(configurations[0].maximumFutureSkewMs, 0);
@@ -700,6 +701,7 @@ TEST(RosNodeParameterTest, UsesOverrideValues) {
 		rclcpp::Parameter("component_monitors.robot.enabled", true),
 		rclcpp::Parameter("component_monitors.robot.display_name", "Robot controller"),
 		rclcpp::Parameter("component_monitors.robot.status_topic", "robot/health"),
+		rclcpp::Parameter("component_monitors.robot.expected_component_id", "robot-1"),
 		rclcpp::Parameter("component_monitors.robot.timeout_ms", 7000),
 		rclcpp::Parameter("component_monitors.robot.maximum_status_age_ms", 5000),
 		rclcpp::Parameter("component_monitors.robot.maximum_future_skew_ms", 1000),
@@ -719,6 +721,7 @@ TEST(RosNodeParameterTest, UsesOverrideValues) {
 	EXPECT_EQ(configurations[0].name, QStringLiteral("robot"));
 	EXPECT_EQ(configurations[0].displayName, QStringLiteral("Robot controller"));
 	EXPECT_EQ(configurations[0].statusTopicName, QStringLiteral("robot/health"));
+	EXPECT_EQ(configurations[0].expectedComponentId, QStringLiteral("robot-1"));
 	EXPECT_EQ(configurations[0].timeoutMs, 7000);
 	EXPECT_EQ(configurations[0].maximumStatusAgeMs, 5000);
 	EXPECT_EQ(configurations[0].maximumFutureSkewMs, 1000);
@@ -830,6 +833,20 @@ TEST(RosNodeParameterTest, RejectsInvalidComponentMonitorParameters) {
 			ros2qtgui::RosNode::TopicReceptionStatusCallback(),
 			ros2qtgui::RosNode::ComponentStatusCallback(),
 			duplicateTopicOptions);
+	});
+
+	rclcpp::NodeOptions invalidExpectedComponentIdOptions;
+	invalidExpectedComponentIdOptions.parameter_overrides({
+		rclcpp::Parameter("component_monitors.camera.expected_component_id", "   "),
+	});
+	EXPECT_ANY_THROW({
+		auto node = std::make_shared<ros2qtgui::RosNode>(
+			[](std::uint64_t) {
+			},
+			ros2qtgui::RosNode::ApplicationEventCallback(),
+			ros2qtgui::RosNode::TopicReceptionStatusCallback(),
+			ros2qtgui::RosNode::ComponentStatusCallback(),
+			invalidExpectedComponentIdOptions);
 	});
 
 	rclcpp::NodeOptions timeoutOptions;
@@ -1007,6 +1024,9 @@ TEST(ComponentStatusQualityIntegrationTest, DegradesInvalidValuesAndReportsRecov
 		rclcpp::Parameter(
 			"component_monitors.quality.status_topic",
 			"quality/status"),
+		rclcpp::Parameter(
+			"component_monitors.quality.expected_component_id",
+			"quality-1"),
 		rclcpp::Parameter("component_monitors.quality.timeout_ms", 1000),
 		rclcpp::Parameter("component_monitors.quality.maximum_status_age_ms", 1000),
 		rclcpp::Parameter("component_monitors.quality.maximum_future_skew_ms", 1000),
@@ -1071,6 +1091,13 @@ TEST(ComponentStatusQualityIntegrationTest, DegradesInvalidValuesAndReportsRecov
 	EXPECT_TRUE(publishAndWait(message));
 	EXPECT_EQ(componentReceiver.status(topicName).state, yds::ros2::ComponentState::kReady);
 	EXPECT_TRUE(componentReceiver.status(topicName).timestamp.isValid());
+
+	message.component_id = "unexpected-component";
+	EXPECT_TRUE(publishAndWait(message));
+	EXPECT_EQ(componentReceiver.status(topicName).state, yds::ros2::ComponentState::kUnknown);
+	EXPECT_EQ(
+		componentReceiver.status(topicName).componentId,
+		QStringLiteral("unexpected-component"));
 
 	message.component_id = " ";
 	message.state = 99;

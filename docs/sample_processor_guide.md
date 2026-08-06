@@ -108,12 +108,13 @@ source /opt/ros/humble/setup.bash
 source install/setup.bash
 locale charmap
 ros2 topic pub /sample_processor/status yds_interfaces/msg/ComponentStatus \
-  "{component_id: '画像処理ノード1', state: 4, error_code: 1001, message: '処理時間が上限に近づいています'}" \
+  "{component_id: 'sample-processor-1', state: 4, error_code: 1001, message: '処理時間が上限に近づいています'}" \
   --qos-reliability reliable --qos-durability transient_local --rate 1
 ```
 
-`locale charmap`が`UTF-8`と表示される環境を使用します。GUIのComponent IDとMessageに日本語が
-文字化けせず表示され、Component stateが`WARNING`、Communicationが`RECEIVING`になることを確認します。
+`locale charmap`が`UTF-8`と表示される環境を使用します。GUIのMessageに日本語が文字化けせず表示され、
+Component IDが設定どおり`sample-processor-1`、Component stateが`WARNING`、Communicationが
+`RECEIVING`になることを確認します。
 送信を`Ctrl+C`で止めると、3秒後に`TIMED OUT`へ変化します。同じ送信コマンドを再実行すると、
 `RECEIVING`へ復旧することも確認できます。
 

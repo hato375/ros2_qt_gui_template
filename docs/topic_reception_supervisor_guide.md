@@ -51,6 +51,7 @@ ros2_qt_gui_node:
         enabled: true
         display_name: Camera
         status_topic: camera/status
+        expected_component_id: camera-1
         timeout_ms: 3000
         maximum_status_age_ms: 0
         maximum_future_skew_ms: 0
@@ -58,6 +59,7 @@ ros2_qt_gui_node:
         enabled: true
         display_name: PLC
         status_topic: plc/status
+        expected_component_id: plc-1
         timeout_ms: 5000
         maximum_status_age_ms: 0
         maximum_future_skew_ms: 0
@@ -72,6 +74,7 @@ ros2_qt_gui_node:
 | `enabled` | `false`の場合はSubscriptionを作成せず、監視対象から除外 |
 | `display_name` | GUIに表示するコンポーネント名。空文字は不可 |
 | `status_topic` | 購読する`yds_interfaces/msg/ComponentStatus`トピック |
+| `expected_component_id` | 期待する送信元ID。空文字で照合無効。空白だけは不可 |
 | `timeout_ms` | 受信タイムアウト時間。500～600000ミリ秒 |
 | `maximum_status_age_ms` | 状態生成時刻の許容経過時間。0で無効、最大86400000ミリ秒 |
 | `maximum_future_skew_ms` | 状態生成時刻の未来方向の許容ずれ。0で無効、最大86400000ミリ秒 |
@@ -181,6 +184,7 @@ Supervisorはメッセージを受信した事実と、ComponentStatus値の品�
 表示し、元のエラーコードとメッセージを保持して警告イベントを記録します。
 
 - Component IDが空または空白だけ
+- `expected_component_id`を設定したトピックで、異なるComponent IDを受信
 - ROSメッセージの状態値が0～7の定義範囲外
 - 正常系状態に非ゼロのエラーコードが設定されている
 - `WARNING`、`ERROR`、`CRITICAL`でエラーコードが0、またはメッセージが空
@@ -189,6 +193,10 @@ Supervisorはメッセージを受信した事実と、ComponentStatus値の品�
 同じ品質問題のheartbeatでは警告を繰り返しません。正常な値へ戻ると復旧イベントを記録し、本来の
 コンポーネント状態表示へ戻します。timestampがゼロの場合は従来どおり受信時刻で補完し、品質問題には
 しません。複数装置間で時計同期を保証できない環境では、時刻検証を0のまま無効にしてください。
+
+`expected_component_id`は、トピック名が正しくても別設備のメッセージが誤って流れた場合に、取り違えを
+検出するための設定です。例えば`camera/status`へ`plc-1`が届いた場合、通信自体は`RECEIVING`ですが、
+設備状態は信頼せず`UNKNOWN`として表示します。受信した実際のComponent IDは原因調査のため保持します。
 
 コンポーネント状態またはエラーコードが変化すると、GUIイベントにも記録されます。`CRITICAL`の通知だけで
 Supervisorが自動停止することはありません。安全停止条件と停止対象は、設備仕様に基づいて

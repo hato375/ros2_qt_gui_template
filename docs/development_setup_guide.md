@@ -178,6 +178,7 @@ src/ros2_qt_gui/config/ros2_qt_gui.yaml
 | `component_monitors.<name>.enabled` | `true` | `true`または`false` | 監視の有効・無効 |
 | `component_monitors.<name>.display_name` | `<name>` | 空文字不可 | GUIに表示するコンポーネント名 |
 | `component_monitors.<name>.status_topic` | `<name>/status` | 空・重複不可 | 監視するコンポーネント状態トピック |
+| `component_monitors.<name>.expected_component_id` | 空文字 | 空文字で照合無効、空白だけは不可 | 期待する送信元ID |
 | `component_monitors.<name>.timeout_ms` | camera: 3000、PLC: 5000 | 500～600000 | 個別の受信タイムアウト時間 |
 | `component_monitors.<name>.maximum_status_age_ms` | 0 | 0～86400000 | 状態生成時刻の許容経過時間。0で検証無効 |
 | `component_monitors.<name>.maximum_future_skew_ms` | 0 | 0～86400000 | 未来方向の許容時刻ずれ。0で検証無効 |
@@ -231,7 +232,9 @@ colcon test --packages-select \
 - Lifecycle Nodeの状態通知、Inactive中の受信継続、タイムアウト、および復旧をSupervisorまで検証する
 - Lifecycle Nodeを実プロセスで起動し、外部サービスによる遷移、状態通知、および正常終了を検証する
 - インストール済みLifecycle APIを別パッケージから継承・リンクできる
+- インストール済み通常ノードAPIを別パッケージから継承・リンクできる
 - 不正なComponentStatusを`UNKNOWN`へ縮退し、品質警告の抑制と復旧を通知する
+- 設定したComponent IDと異なる送信元を`UNKNOWN`へ縮退する
 - ロジック系サンプルノードが`INITIALIZING`、`READY`、`RUNNING`を通知する
 - Executorを複数回停止しても安全に終了する
 - パラメータの既定値と上書き値が適用される

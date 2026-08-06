@@ -20,6 +20,7 @@ if(BUILD_TESTING)
 	)
 	target_link_libraries(
 		sample_processor_public_api_test
+		sample_processor::sample_processor_node
 		sample_processor::sample_lifecycle_processor_node
 	)
 	ament_target_dependencies(sample_processor_public_api_test rclcpp)

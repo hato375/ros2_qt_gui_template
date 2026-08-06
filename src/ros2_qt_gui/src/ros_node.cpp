@@ -45,6 +45,7 @@ enum ComponentStatusQualityIssue : std::uint32_t {
 	kMissingMessage = 1U << 4,
 	kStaleTimestamp = 1U << 5,
 	kFutureTimestamp = 1U << 6,
+	kUnexpectedComponentId = 1U << 7,
 };
 
 QString componentStatusQualityIssueText(std::uint32_t issues) {
@@ -69,6 +70,9 @@ QString componentStatusQualityIssueText(std::uint32_t issues) {
 	}
 	if ((issues & kFutureTimestamp) != 0U) {
 		descriptions.push_back(QStringLiteral("timestamp is too far in the future"));
+	}
+	if ((issues & kUnexpectedComponentId) != 0U) {
+		descriptions.push_back(QStringLiteral("component ID does not match configuration"));
 	}
 	return descriptions.join(QStringLiteral(", "));
 }
@@ -205,6 +209,11 @@ RosNode::RosNode(
 			parameterPrefix + ".status_topic",
 			monitorName + "/status",
 			makeReadOnlyDescriptor("yds_interfaces/ComponentStatus topic name."));
+		const std::string expectedComponentId = declare_parameter<std::string>(
+			parameterPrefix + ".expected_component_id",
+			std::string(),
+			makeReadOnlyDescriptor(
+				"Expected ComponentStatus component ID. Empty disables validation."));
 		const std::int64_t timeoutMs = declare_parameter<std::int64_t>(
 			parameterPrefix + ".timeout_ms",
 			defaultTimeoutMs(monitorName),
@@ -233,6 +242,11 @@ RosNode::RosNode(
 		if (topicName.empty()) {
 			throw std::invalid_argument(parameterPrefix + ".status_topic must not be empty");
 		}
+		if (!expectedComponentId.empty() &&
+			QString::fromStdString(expectedComponentId).trimmed().isEmpty()) {
+			throw std::invalid_argument(
+				parameterPrefix + ".expected_component_id must not contain only whitespace");
+		}
 		if (!uniqueTopicNames.insert(topicName).second) {
 			throw std::invalid_argument("component monitor status topics must not contain duplicates");
 		}
@@ -256,6 +270,7 @@ RosNode::RosNode(
 				QString::fromStdString(monitorName),
 				QString::fromStdString(displayName),
 				QString::fromStdString(topicName),
+				QString::fromStdString(expectedComponentId),
 				timeoutMs,
 				maximumStatusAgeMs,
 				maximumFutureSkewMs});
@@ -314,13 +329,17 @@ RosNode::RosNode(
 		const QByteArray monitorNameUtf8 = configuration.name.toUtf8();
 		const QByteArray displayNameUtf8 = configuration.displayName.toUtf8();
 		const QByteArray topicNameUtf8 = configuration.statusTopicName.toUtf8();
+		const QByteArray expectedComponentIdUtf8 =
+			configuration.expectedComponentId.toUtf8();
 		RCLCPP_INFO(
 			get_logger(),
-			"Component monitor enabled: name=%s, display_name=%s, topic=%s, timeout_ms=%ld, "
+			"Component monitor enabled: name=%s, display_name=%s, topic=%s, "
+			"expected_component_id=%s, timeout_ms=%ld, "
 			"maximum_status_age_ms=%ld, maximum_future_skew_ms=%ld",
 			monitorNameUtf8.constData(),
 			displayNameUtf8.constData(),
 			topicNameUtf8.constData(),
+			expectedComponentIdUtf8.constData(),
 			static_cast<long>(configuration.timeoutMs),
 			static_cast<long>(configuration.maximumStatusAgeMs),
 			static_cast<long>(configuration.maximumFutureSkewMs));
@@ -374,6 +393,10 @@ void RosNode::onMonitoredTopic(
 		std::uint32_t qualityIssues = kNoQualityIssue;
 		if (status.componentId.trimmed().isEmpty()) {
 			qualityIssues |= kEmptyComponentId;
+		}
+		if (!configuration.expectedComponentId.isEmpty() &&
+			status.componentId != configuration.expectedComponentId) {
+			qualityIssues |= kUnexpectedComponentId;
 		}
 		if (!yds::ros2::isDefinedComponentState(message->state)) {
 			qualityIssues |= kUndefinedState;
