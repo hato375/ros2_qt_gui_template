@@ -146,7 +146,9 @@ ComponentStatusには内部情報を含まない定型メッセージを設定�
 処理タイマーは各フックより先に停止します。フックが`false`を返した場合や例外を送出した場合は
 ComponentStatusを`ERROR`にし、error処理成功後は`unconfigured`へ戻ります。shutdown処理の失敗時も
 `finalized`にしたことにはせず、原因を解消してshutdownを再試行できます。デストラクタだけに安全停止を
-依存させず、`shutdownProcessor()`は複数回呼ばれても安全な処理として実装してください。
+依存させず、`shutdownProcessor()`は複数回呼ばれても安全な処理として実装してください。shutdownは
+Unconfigured、Inactive、Activeのどの状態からも呼ばれます。Activeからの場合も処理タイマーを先に停止し、
+フック成功後にComponentStatusを`STOPPED`としてLifecycle状態を`finalized`へ遷移させます。
 
 ComponentStatus通知は安全停止を代行しません。`ERROR`や`CRITICAL`を通知する処理とは別に、必要な停止、
 リトライ、復旧処理を実装します。

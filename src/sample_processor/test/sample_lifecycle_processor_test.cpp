@@ -150,6 +150,25 @@ private:
 	bool failNextShutdown_ = true;
 };
 
+class ShutdownTrackingNode final
+	: public sampleprocessor::SampleLifecycleProcessorNode {
+public:
+	using SampleLifecycleProcessorNode::SampleLifecycleProcessorNode;
+
+	int shutdownCallCount() const noexcept {
+		return shutdownCallCount_;
+	}
+
+protected:
+	bool shutdownProcessor(QString&) override {
+		++shutdownCallCount_;
+		return true;
+	}
+
+private:
+	int shutdownCallCount_ = 0;
+};
+
 TEST(SampleLifecycleProcessorNodeTest, RejectsInvalidProcessingInterval) {
 	rclcpp::NodeOptions options;
 	options.parameter_overrides({
@@ -452,6 +471,63 @@ TEST(SampleLifecycleProcessorNodeTest, ReportsShutdownFailureAndAllowsRetry) {
 	EXPECT_EQ(node->get_current_state().label(), "finalized");
 	EXPECT_EQ(node->componentStatus().state, yds::ros2::ComponentState::kStopped);
 	EXPECT_EQ(node->componentStatus().errorCode, 0);
+}
+
+TEST(SampleLifecycleProcessorNodeTest, ShutsDownFromUnconfiguredAndInactiveStates) {
+	{
+		auto node = std::make_shared<ShutdownTrackingNode>();
+
+		node->shutdown();
+
+		EXPECT_EQ(node->get_current_state().label(), "finalized");
+		EXPECT_EQ(node->shutdownCallCount(), 1);
+		EXPECT_EQ(node->componentStatus().state, yds::ros2::ComponentState::kStopped);
+	}
+	{
+		auto node = std::make_shared<ShutdownTrackingNode>();
+		node->configure();
+		ASSERT_EQ(node->get_current_state().label(), "inactive");
+
+		node->shutdown();
+
+		EXPECT_EQ(node->get_current_state().label(), "finalized");
+		EXPECT_EQ(node->shutdownCallCount(), 1);
+		EXPECT_EQ(node->componentStatus().state, yds::ros2::ComponentState::kStopped);
+	}
+}
+
+TEST(SampleLifecycleProcessorNodeTest, StopsProcessingWhenShuttingDownFromActiveState) {
+	rclcpp::NodeOptions options;
+	options.parameter_overrides({
+		rclcpp::Parameter("processing_interval_ms", 100),
+	});
+	auto node = std::make_shared<ShutdownTrackingNode>(options);
+	node->configure();
+	node->activate();
+	ASSERT_EQ(node->get_current_state().label(), "active");
+
+	rclcpp::executors::SingleThreadedExecutor executor;
+	executor.add_node(node->get_node_base_interface());
+	std::thread executorThread([&executor]() {
+		executor.spin();
+	});
+	const auto processingDeadline = std::chrono::steady_clock::now() + 2s;
+	while (node->processedCount() == 0 &&
+		std::chrono::steady_clock::now() < processingDeadline) {
+		std::this_thread::sleep_for(10ms);
+	}
+	EXPECT_GE(node->processedCount(), 1U);
+
+	node->shutdown();
+	const std::uint64_t processedCountAfterShutdown = node->processedCount();
+	std::this_thread::sleep_for(150ms);
+	executor.cancel();
+	executorThread.join();
+
+	EXPECT_EQ(node->get_current_state().label(), "finalized");
+	EXPECT_EQ(node->shutdownCallCount(), 1);
+	EXPECT_EQ(node->processedCount(), processedCountAfterShutdown);
+	EXPECT_EQ(node->componentStatus().state, yds::ros2::ComponentState::kStopped);
 }
 
 TEST(SampleLifecycleProcessorNodeTest, UpdatesStatusForCleanupAndShutdown) {
