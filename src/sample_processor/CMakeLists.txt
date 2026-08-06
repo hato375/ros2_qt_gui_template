@@ -10,6 +10,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 find_package(ament_cmake REQUIRED)
 find_package(rcl_interfaces REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(rclcpp_lifecycle REQUIRED)
 find_package(std_srvs REQUIRED)
 find_package(Qt5 REQUIRED COMPONENTS Core)
 find_package(yds_interfaces REQUIRED)
@@ -25,18 +26,43 @@ target_include_directories(sample_processor_node
 target_link_libraries(sample_processor_node Qt5::Core yds_ros2::yds_ros2)
 ament_target_dependencies(sample_processor_node rcl_interfaces rclcpp std_srvs)
 
+add_library(sample_lifecycle_processor_node
+	src/sample_lifecycle_processor_node.cpp
+)
+target_include_directories(sample_lifecycle_processor_node
+	PUBLIC
+		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+)
+target_link_libraries(sample_lifecycle_processor_node Qt5::Core yds_ros2::yds_ros2)
+ament_target_dependencies(
+	sample_lifecycle_processor_node
+	rcl_interfaces
+	rclcpp
+	rclcpp_lifecycle
+)
+
 add_executable(sample_processor
 	src/main.cpp
 )
 target_link_libraries(sample_processor sample_processor_node)
 ament_target_dependencies(sample_processor rclcpp)
 
+add_executable(sample_lifecycle_processor
+	src/lifecycle_main.cpp
+)
+target_link_libraries(sample_lifecycle_processor sample_lifecycle_processor_node)
+ament_target_dependencies(sample_lifecycle_processor rclcpp rclcpp_lifecycle)
+
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
 	target_compile_options(sample_processor_node PRIVATE -Wall -Wextra -Wpedantic)
+	target_compile_options(sample_lifecycle_processor_node PRIVATE -Wall -Wextra -Wpedantic)
 	target_compile_options(sample_processor PRIVATE -Wall -Wextra -Wpedantic)
+	target_compile_options(sample_lifecycle_processor PRIVATE -Wall -Wextra -Wpedantic)
 elseif(MSVC)
 	target_compile_options(sample_processor_node PRIVATE /W4)
+	target_compile_options(sample_lifecycle_processor_node PRIVATE /W4)
 	target_compile_options(sample_processor PRIVATE /W4)
+	target_compile_options(sample_lifecycle_processor PRIVATE /W4)
 endif()
 
 if(BUILD_TESTING)
@@ -45,9 +71,20 @@ if(BUILD_TESTING)
 	ament_add_gtest(sample_processor_test
 		SKIP_LINKING_MAIN_LIBRARIES
 		test/sample_processor_test.cpp
+		test/sample_lifecycle_processor_test.cpp
 	)
-	target_link_libraries(sample_processor_test sample_processor_node)
-	ament_target_dependencies(sample_processor_test rclcpp std_srvs yds_interfaces)
+	target_link_libraries(
+		sample_processor_test
+		sample_processor_node
+		sample_lifecycle_processor_node
+	)
+	ament_target_dependencies(
+		sample_processor_test
+		rclcpp
+		rclcpp_lifecycle
+		std_srvs
+		yds_interfaces
+	)
 
 	if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
 		target_compile_options(sample_processor_test PRIVATE -Wall -Wextra -Wpedantic)
@@ -56,7 +93,7 @@ if(BUILD_TESTING)
 	endif()
 endif()
 
-install(TARGETS sample_processor
+install(TARGETS sample_processor sample_lifecycle_processor
 	DESTINATION lib/${PROJECT_NAME}
 )
 

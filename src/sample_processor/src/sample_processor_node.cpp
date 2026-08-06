@@ -10,6 +10,8 @@
 #include <rcl_interfaces/msg/integer_range.hpp>
 #include <rcl_interfaces/msg/parameter_descriptor.hpp>
 
+#include <yds/ros2/component_status_parameters.h>
+
 namespace {
 
 constexpr std::int64_t kMinimumIntervalMs = 100;
@@ -61,26 +63,14 @@ SampleProcessorNode::SampleProcessorNode(const rclcpp::NodeOptions& options)
 	  recoverService_() {
 	validateInterval("processing_interval_ms", processingIntervalMs_);
 
-	const QString componentId = QString::fromStdString(declare_parameter<std::string>(
-		"component_status.component_id",
-		"sample-processor-1",
-		readOnlyDescriptor("Component ID.")));
-	const QString statusTopicName = QString::fromStdString(declare_parameter<std::string>(
-		"component_status.status_topic",
-		"sample_processor/status",
-		readOnlyDescriptor("Component status topic name.")));
-	const std::int64_t publishIntervalMs = declare_parameter<std::int64_t>(
-		"component_status.publish_interval_ms",
-		1000,
-		intervalDescriptor("Component status publish interval in milliseconds."));
-	validateInterval("component_status.publish_interval_ms", publishIntervalMs);
-
 	statusPublisher_ = std::make_unique<yds::ros2::ComponentStatusPublisher>(
 		*this,
-		yds::ros2::ComponentStatusPublisherConfiguration{
-			componentId,
-			statusTopicName,
-			std::chrono::milliseconds(publishIntervalMs)});
+		yds::ros2::declareComponentStatusPublisherParameters(
+			*this,
+			yds::ros2::ComponentStatusPublisherConfiguration{
+				QStringLiteral("sample-processor-1"),
+				QStringLiteral("sample_processor/status"),
+				std::chrono::milliseconds(1000)}));
 	processingTimer_ = create_wall_timer(
 		std::chrono::milliseconds(processingIntervalMs_),
 		[this]() {

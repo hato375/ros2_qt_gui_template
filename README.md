@@ -32,6 +32,7 @@ source install/setup.bash
 `yds::ros2::TopicReceptionMonitor`はROSメッセージ型に依存せず、camera、PLC、Supervisorなどの
 ノードから共通利用できます。
 監視ダイアログの組み込み方法は`docs/component_monitor_dialog_guide.md`を参照してください。
+Lifecycle Nodeへの組み込み例は`docs/sample_lifecycle_processor_guide.md`を参照してください。
 
 ## 起動
 

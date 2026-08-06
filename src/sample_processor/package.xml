@@ -4,7 +4,7 @@
 <package format="3">
 	<name>sample_processor</name>
 	<version>0.1.0</version>
-	<description>ComponentStatusPublisherを利用するロジック系サンプルノード</description>
+	<description>通常ノードとLifecycleノードでComponentStatusPublisherを利用するサンプル</description>
 	<maintainer email="developer@example.com">Developer</maintainer>
 	<license>Apache-2.0</license>
 
@@ -12,6 +12,7 @@
 
 	<depend>rcl_interfaces</depend>
 	<depend>rclcpp</depend>
+	<depend>rclcpp_lifecycle</depend>
 	<depend>std_srvs</depend>
 	<depend>qtbase5-dev</depend>
 	<depend>yds_interfaces</depend>

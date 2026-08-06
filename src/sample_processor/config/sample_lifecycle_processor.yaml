@@ -1,0 +1,7 @@
+sample_lifecycle_processor_node:
+  ros__parameters:
+    processing_interval_ms: 1000
+    component_status:
+      component_id: sample-lifecycle-processor-1
+      status_topic: sample_lifecycle_processor/status
+      publish_interval_ms: 1000
