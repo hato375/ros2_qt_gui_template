@@ -11,10 +11,35 @@
 #include <yds_interfaces/msg/component_status.hpp>
 
 #include <sample_processor/sample_lifecycle_processor_node.h>
+#include <yds/ros2/component_status.h>
 
 namespace {
 
 using namespace std::chrono_literals;
+
+class ConfigureFailureNode final
+	: public sampleprocessor::SampleLifecycleProcessorNode {
+public:
+	using SampleLifecycleProcessorNode::SampleLifecycleProcessorNode;
+
+protected:
+	bool configureProcessor(QString& errorMessage) override {
+		errorMessage = QStringLiteral("Camera connection failed");
+		return false;
+	}
+};
+
+class ActivateFailureNode final
+	: public sampleprocessor::SampleLifecycleProcessorNode {
+public:
+	using SampleLifecycleProcessorNode::SampleLifecycleProcessorNode;
+
+protected:
+	bool activateProcessor(QString& errorMessage) override {
+		errorMessage = QStringLiteral("Processor start failed");
+		return false;
+	}
+};
 
 TEST(SampleLifecycleProcessorNodeTest, RejectsInvalidProcessingInterval) {
 	rclcpp::NodeOptions options;
@@ -105,6 +130,51 @@ TEST(SampleLifecycleProcessorNodeTest, ProcessesOnlyWhileActiveAndPublishesWhile
 	EXPECT_GT(receivedCount, receivedCountAfterDeactivate);
 	EXPECT_EQ(latestState, yds_interfaces::msg::ComponentStatus::STATE_STOPPED);
 	EXPECT_EQ(latestComponentId, "lifecycle-processor-test");
+}
+
+TEST(SampleLifecycleProcessorNodeTest, ReportsConfigureFailureAsComponentError) {
+	auto node = std::make_shared<ConfigureFailureNode>();
+
+	node->configure();
+
+	EXPECT_EQ(node->get_current_state().label(), "unconfigured");
+	const yds::ros2::ComponentStatus status = node->componentStatus();
+	EXPECT_EQ(status.state, yds::ros2::ComponentState::kError);
+	EXPECT_EQ(status.errorCode, 9101);
+	EXPECT_EQ(status.message, QStringLiteral("Camera connection failed"));
+}
+
+TEST(SampleLifecycleProcessorNodeTest, ReportsActivateFailureAsComponentError) {
+	auto node = std::make_shared<ActivateFailureNode>();
+
+	node->configure();
+	ASSERT_EQ(node->get_current_state().label(), "inactive");
+	node->activate();
+
+	EXPECT_EQ(node->get_current_state().label(), "unconfigured");
+	const yds::ros2::ComponentStatus status = node->componentStatus();
+	EXPECT_EQ(status.state, yds::ros2::ComponentState::kError);
+	EXPECT_EQ(status.errorCode, 9102);
+	EXPECT_EQ(status.message, QStringLiteral("Processor start failed"));
+}
+
+TEST(SampleLifecycleProcessorNodeTest, UpdatesStatusForCleanupAndShutdown) {
+	auto node = std::make_shared<sampleprocessor::SampleLifecycleProcessorNode>();
+
+	node->configure();
+	ASSERT_EQ(node->get_current_state().label(), "inactive");
+	node->cleanup();
+	EXPECT_EQ(node->get_current_state().label(), "unconfigured");
+	EXPECT_EQ(
+		node->componentStatus().state,
+		yds::ros2::ComponentState::kInitializing);
+	EXPECT_EQ(node->processedCount(), 0U);
+
+	node->shutdown();
+	EXPECT_EQ(node->get_current_state().label(), "finalized");
+	EXPECT_EQ(
+		node->componentStatus().state,
+		yds::ros2::ComponentState::kStopped);
 }
 
 }  // namespace

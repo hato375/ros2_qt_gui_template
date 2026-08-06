@@ -14,7 +14,9 @@
 | deactivate | `STOPPED` | 停止 |
 | cleanup | `INITIALIZING` | 停止、処理回数をリセット |
 | shutdown | `STOPPED` | 停止 |
-| error処理 | `ERROR`、エラーコード`9001` | 停止 |
+| configure失敗 | `ERROR`、エラーコード`9101` | 停止 |
+| activate失敗 | `ERROR`、エラーコード`9102` | 停止 |
+| その他のerror処理 | `ERROR`、エラーコード`9001` | 停止 |
 
 ComponentStatusの定期通知は処理タイマーとは別に動作します。このため、Lifecycle NodeがInactiveで
 処理を停止していてもheartbeatは継続し、Supervisorは正常なInactive状態と通信断を区別できます。
@@ -83,6 +85,24 @@ Lifecycle Nodeで同じパラメータ構造を利用できます。
 このサンプルのLifecycle状態とComponentStatusの対応は一例です。実案件では、Lifecycle遷移が成功しても
 設備が運転可能とは限りません。カメラ接続、PLC応答、キャリブレーション、安全信号などを確認したうえで、
 設備の実態に合うComponentStatusを明示的に設定してください。
+
+`SampleLifecycleProcessorNode`を派生させ、設備固有の初期化処理を`configureProcessor()`、処理開始を
+`activateProcessor()`へ実装できます。成功時は`true`を返します。失敗時は`errorMessage`へ理由を設定して
+`false`を返すと、Lifecycle遷移はerror処理を経て`unconfigured`へ戻り、ComponentStatusは
+`ERROR`になります。状態通知のheartbeatはその後も継続します。
+
+```cpp
+bool CameraProcessorNode::configureProcessor(QString& errorMessage) {
+	if (!camera_.connect()) {
+		errorMessage = QStringLiteral("Camera connection failed");
+		return false;
+	}
+	return true;
+}
+```
+
+状態通知自体に失敗した場合もLifecycleコールバックは`ERROR`を返します。error処理で`ERROR`通知を
+再試行し、それにも失敗した場合は`FAILURE`を返してLifecycle状態を`finalized`へ遷移させます。
 
 ComponentStatus通知は安全停止を代行しません。`ERROR`や`CRITICAL`を通知する処理とは別に、必要な停止、
 リトライ、復旧処理を実装します。

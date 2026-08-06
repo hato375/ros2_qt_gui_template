@@ -4,6 +4,8 @@
 #include <cstdint>
 #include <memory>
 
+#include <QString>
+
 #include <rclcpp/rclcpp.hpp>
 #include <rclcpp_lifecycle/lifecycle_node.hpp>
 
@@ -12,7 +14,7 @@
 namespace sampleprocessor {
 
 /// @brief コンポーネント状態通知を実装したLifecycleサンプルノード
-class SampleLifecycleProcessorNode final : public rclcpp_lifecycle::LifecycleNode {
+class SampleLifecycleProcessorNode : public rclcpp_lifecycle::LifecycleNode {
 public:
 	/// @brief Lifecycleサンプル処理ノードを生成する
 	/// @param options ROSノードオプション
@@ -33,7 +35,19 @@ public:
 	/// @brief 完了したサンプル処理回数を取得する
 	std::uint64_t processedCount() const noexcept;
 
+	/// @brief 現在のコンポーネント状態を取得する
+	yds::ros2::ComponentStatus componentStatus() const;
+
 protected:
+	/// @brief configure時の設備固有処理。派生クラスで接続や設定処理へ置き換える
+	/// @param errorMessage 失敗理由。falseを返す場合に設定する
+	/// @return 成功した場合true
+	virtual bool configureProcessor(QString& errorMessage);
+	/// @brief activate時の設備固有処理。派生クラスで処理開始へ置き換える
+	/// @param errorMessage 失敗理由。falseを返す場合に設定する
+	/// @return 成功した場合true
+	virtual bool activateProcessor(QString& errorMessage);
+
 	CallbackReturn on_configure(const rclcpp_lifecycle::State& previousState) override;
 	CallbackReturn on_cleanup(const rclcpp_lifecycle::State& previousState) override;
 	CallbackReturn on_activate(const rclcpp_lifecycle::State& previousState) override;
@@ -50,6 +64,8 @@ private:
 
 	std::int64_t processingIntervalMs_;
 	std::atomic<std::uint64_t> processedCount_;
+	qint32 transitionErrorCode_;
+	QString transitionErrorMessage_;
 	std::unique_ptr<yds::ros2::ComponentStatusPublisher> statusPublisher_;
 	rclcpp::TimerBase::SharedPtr processingTimer_;
 };

@@ -42,6 +42,8 @@ SampleLifecycleProcessorNode::SampleLifecycleProcessorNode(
 		  1000,
 		  processingIntervalDescriptor())),
 	  processedCount_(0),
+	  transitionErrorCode_(0),
+	  transitionErrorMessage_(),
 	  statusPublisher_(),
 	  processingTimer_() {
 	if (processingIntervalMs_ < kMinimumIntervalMs ||
@@ -74,9 +76,32 @@ std::uint64_t SampleLifecycleProcessorNode::processedCount() const noexcept {
 	return processedCount_.load();
 }
 
+yds::ros2::ComponentStatus SampleLifecycleProcessorNode::componentStatus() const {
+	return statusPublisher_->status();
+}
+
+bool SampleLifecycleProcessorNode::configureProcessor(QString&) {
+	return true;
+}
+
+bool SampleLifecycleProcessorNode::activateProcessor(QString&) {
+	return true;
+}
+
 SampleLifecycleProcessorNode::CallbackReturn SampleLifecycleProcessorNode::on_configure(
 	const rclcpp_lifecycle::State&) {
 	RCLCPP_INFO(get_logger(), "Configuring lifecycle sample processor");
+	transitionErrorCode_ = 0;
+	transitionErrorMessage_.clear();
+	QString errorMessage;
+	if (!configureProcessor(errorMessage)) {
+		transitionErrorCode_ = 9101;
+		transitionErrorMessage_ = errorMessage.trimmed().isEmpty()
+			? QStringLiteral("Processor configuration failed")
+			: errorMessage;
+		RCLCPP_ERROR(get_logger(), "Lifecycle sample processor configuration failed");
+		return CallbackReturn::ERROR;
+	}
 	return updateComponentStatus(
 		yds::ros2::ComponentState::kReady,
 		0,
@@ -101,6 +126,17 @@ SampleLifecycleProcessorNode::CallbackReturn SampleLifecycleProcessorNode::on_cl
 SampleLifecycleProcessorNode::CallbackReturn SampleLifecycleProcessorNode::on_activate(
 	const rclcpp_lifecycle::State&) {
 	RCLCPP_INFO(get_logger(), "Activating lifecycle sample processor");
+	transitionErrorCode_ = 0;
+	transitionErrorMessage_.clear();
+	QString errorMessage;
+	if (!activateProcessor(errorMessage)) {
+		transitionErrorCode_ = 9102;
+		transitionErrorMessage_ = errorMessage.trimmed().isEmpty()
+			? QStringLiteral("Processor activation failed")
+			: errorMessage;
+		RCLCPP_ERROR(get_logger(), "Lifecycle sample processor activation failed");
+		return CallbackReturn::ERROR;
+	}
 	if (!updateComponentStatus(
 			yds::ros2::ComponentState::kRunning,
 			0,
@@ -139,10 +175,16 @@ SampleLifecycleProcessorNode::CallbackReturn SampleLifecycleProcessorNode::on_er
 	const rclcpp_lifecycle::State&) {
 	processingTimer_->cancel();
 	RCLCPP_ERROR(get_logger(), "Lifecycle sample processor transition failed");
+	const qint32 errorCode = transitionErrorCode_ == 0 ? 9001 : transitionErrorCode_;
+	const QString errorMessage = transitionErrorMessage_.isEmpty()
+		? QStringLiteral("Lifecycle transition failed")
+		: transitionErrorMessage_;
+	transitionErrorCode_ = 0;
+	transitionErrorMessage_.clear();
 	return updateComponentStatus(
 		yds::ros2::ComponentState::kError,
-		9001,
-		QStringLiteral("Lifecycle transition failed"))
+		errorCode,
+		errorMessage)
 		? CallbackReturn::SUCCESS
 		: CallbackReturn::FAILURE;
 }
