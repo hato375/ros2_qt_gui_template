@@ -835,6 +835,20 @@ TEST(RosNodeParameterTest, RejectsInvalidComponentMonitorParameters) {
 			duplicateTopicOptions);
 	});
 
+	rclcpp::NodeOptions equivalentTopicOptions;
+	equivalentTopicOptions.parameter_overrides({
+		rclcpp::Parameter("component_monitors.plc.status_topic", "/camera/status"),
+	});
+	EXPECT_ANY_THROW({
+		auto node = std::make_shared<ros2qtgui::RosNode>(
+			[](std::uint64_t) {
+			},
+			ros2qtgui::RosNode::ApplicationEventCallback(),
+			ros2qtgui::RosNode::TopicReceptionStatusCallback(),
+			ros2qtgui::RosNode::ComponentStatusCallback(),
+			equivalentTopicOptions);
+	});
+
 	rclcpp::NodeOptions invalidExpectedComponentIdOptions;
 	invalidExpectedComponentIdOptions.parameter_overrides({
 		rclcpp::Parameter("component_monitors.camera.expected_component_id", "   "),
@@ -847,6 +861,35 @@ TEST(RosNodeParameterTest, RejectsInvalidComponentMonitorParameters) {
 			ros2qtgui::RosNode::TopicReceptionStatusCallback(),
 			ros2qtgui::RosNode::ComponentStatusCallback(),
 			invalidExpectedComponentIdOptions);
+	});
+
+	rclcpp::NodeOptions paddedExpectedComponentIdOptions;
+	paddedExpectedComponentIdOptions.parameter_overrides({
+		rclcpp::Parameter("component_monitors.camera.expected_component_id", " camera-1"),
+	});
+	EXPECT_ANY_THROW({
+		auto node = std::make_shared<ros2qtgui::RosNode>(
+			[](std::uint64_t) {
+			},
+			ros2qtgui::RosNode::ApplicationEventCallback(),
+			ros2qtgui::RosNode::TopicReceptionStatusCallback(),
+			ros2qtgui::RosNode::ComponentStatusCallback(),
+			paddedExpectedComponentIdOptions);
+	});
+
+	rclcpp::NodeOptions duplicateExpectedComponentIdOptions;
+	duplicateExpectedComponentIdOptions.parameter_overrides({
+		rclcpp::Parameter("component_monitors.camera.expected_component_id", "controller-1"),
+		rclcpp::Parameter("component_monitors.plc.expected_component_id", "controller-1"),
+	});
+	EXPECT_ANY_THROW({
+		auto node = std::make_shared<ros2qtgui::RosNode>(
+			[](std::uint64_t) {
+			},
+			ros2qtgui::RosNode::ApplicationEventCallback(),
+			ros2qtgui::RosNode::TopicReceptionStatusCallback(),
+			ros2qtgui::RosNode::ComponentStatusCallback(),
+			duplicateExpectedComponentIdOptions);
 	});
 
 	rclcpp::NodeOptions timeoutOptions;

@@ -189,7 +189,8 @@ RosNode::RosNode(
 		throw std::invalid_argument("component_monitor_names must not be empty");
 	}
 	std::set<std::string> uniqueMonitorNames;
-	std::set<std::string> uniqueTopicNames;
+	std::set<std::string> uniqueResolvedTopicNames;
+	std::set<std::string> uniqueExpectedComponentIds;
 	for (const auto& monitorName : componentMonitorNames_) {
 		validateMonitorName(monitorName);
 		if (!uniqueMonitorNames.insert(monitorName).second) {
@@ -236,19 +237,27 @@ RosNode::RosNode(
 				0,
 				kMaximumTimestampToleranceMs));
 
-		if (displayName.empty()) {
-			throw std::invalid_argument(parameterPrefix + ".display_name must not be empty");
+		if (QString::fromStdString(displayName).trimmed().isEmpty()) {
+			throw std::invalid_argument(
+				parameterPrefix + ".display_name must not be empty or whitespace");
 		}
 		if (topicName.empty()) {
 			throw std::invalid_argument(parameterPrefix + ".status_topic must not be empty");
 		}
-		if (!expectedComponentId.empty() &&
-			QString::fromStdString(expectedComponentId).trimmed().isEmpty()) {
+		const QString expectedComponentIdText = QString::fromStdString(expectedComponentId);
+		if (expectedComponentIdText != expectedComponentIdText.trimmed()) {
 			throw std::invalid_argument(
-				parameterPrefix + ".expected_component_id must not contain only whitespace");
+				parameterPrefix + ".expected_component_id must not have surrounding whitespace");
 		}
-		if (!uniqueTopicNames.insert(topicName).second) {
+		const std::string resolvedTopicName =
+			get_node_topics_interface()->resolve_topic_name(topicName);
+		if (!uniqueResolvedTopicNames.insert(resolvedTopicName).second) {
 			throw std::invalid_argument("component monitor status topics must not contain duplicates");
+		}
+		if (enabled && !expectedComponentId.empty() &&
+			!uniqueExpectedComponentIds.insert(expectedComponentId).second) {
+			throw std::invalid_argument(
+				"enabled component monitors must not have duplicate expected component IDs");
 		}
 		validateInterval(
 			parameterPrefix + ".timeout_ms",

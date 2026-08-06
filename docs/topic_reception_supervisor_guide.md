@@ -72,15 +72,17 @@ ros2_qt_gui_node:
 | 項目 | 説明 |
 |---|---|
 | `enabled` | `false`の場合はSubscriptionを作成せず、監視対象から除外 |
-| `display_name` | GUIに表示するコンポーネント名。空文字は不可 |
-| `status_topic` | 購読する`yds_interfaces/msg/ComponentStatus`トピック |
-| `expected_component_id` | 期待する送信元ID。空文字で照合無効。空白だけは不可 |
+| `display_name` | GUIに表示するコンポーネント名。空文字・空白だけは不可 |
+| `status_topic` | 購読する`yds_interfaces/msg/ComponentStatus`トピック。ROS上での重複不可 |
+| `expected_component_id` | 期待する送信元ID。空文字で照合無効。前後空白・有効な監視間の重複不可 |
 | `timeout_ms` | 受信タイムアウト時間。500～600000ミリ秒 |
 | `maximum_status_age_ms` | 状態生成時刻の許容経過時間。0で無効、最大86400000ミリ秒 |
 | `maximum_future_skew_ms` | 状態生成時刻の未来方向の許容ずれ。0で無効、最大86400000ミリ秒 |
 
-設定名、トピック名の重複、空のトピック名、範囲外のタイムアウト・時刻許容値、または全設定が無効の場合、
-Supervisorは購読を開始せず起動エラーにします。
+設定名、ROS上で解決したトピック名、または有効な監視間の期待Component IDが重複する場合、空の
+トピック名、範囲外のタイムアウト・時刻許容値、または全設定が無効の場合、Supervisorは購読を開始せず
+起動エラーにします。例えばルート名前空間の`camera/status`と`/camera/status`は表記が異なっても同じ
+購読先へ解決されるため、重複として扱います。
 
 監視対象を増やす場合は、例えば`component_monitor_names`へ`rear_camera`を追加し、
 `component_monitors.rear_camera`以下へ設定を追加します。トピック名とタイムアウトが同じ設定ブロックに

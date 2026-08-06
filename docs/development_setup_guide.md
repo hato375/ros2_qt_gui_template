@@ -176,9 +176,9 @@ src/ros2_qt_gui/config/ros2_qt_gui.yaml
 | `gui_status_check_interval_ms` | 200 | 50～10000 | GUIによるROS状態確認周期 |
 | `component_monitor_names` | `[camera, plc]` | 先頭は英字・`_`、英数字・`_`、重複不可 | 監視設定名の一覧 |
 | `component_monitors.<name>.enabled` | `true` | `true`または`false` | 監視の有効・無効 |
-| `component_monitors.<name>.display_name` | `<name>` | 空文字不可 | GUIに表示するコンポーネント名 |
-| `component_monitors.<name>.status_topic` | `<name>/status` | 空・重複不可 | 監視するコンポーネント状態トピック |
-| `component_monitors.<name>.expected_component_id` | 空文字 | 空文字で照合無効、空白だけは不可 | 期待する送信元ID |
+| `component_monitors.<name>.display_name` | `<name>` | 空文字・空白だけは不可 | GUIに表示するコンポーネント名 |
+| `component_monitors.<name>.status_topic` | `<name>/status` | 空・ROS上での重複不可 | 監視するコンポーネント状態トピック |
+| `component_monitors.<name>.expected_component_id` | 空文字 | 空文字で照合無効、前後空白・有効な監視間の重複不可 | 期待する送信元ID |
 | `component_monitors.<name>.timeout_ms` | camera: 3000、PLC: 5000 | 500～600000 | 個別の受信タイムアウト時間 |
 | `component_monitors.<name>.maximum_status_age_ms` | 0 | 0～86400000 | 状態生成時刻の許容経過時間。0で検証無効 |
 | `component_monitors.<name>.maximum_future_skew_ms` | 0 | 0～86400000 | 未来方向の許容時刻ずれ。0で検証無効 |
@@ -198,6 +198,11 @@ ros2 launch ros2_qt_gui ros2_qt_gui.launch.py \
 3. `launch/ros2_qt_gui.launch.py`の既定ファイル名とノード名
 
 YAML内のノード名と実際に起動するノード名が一致しない場合、設定値が適用されません。
+
+起動時には、値の範囲だけでなく監視設定同士の矛盾も検査します。例えば`camera/status`と
+`/camera/status`は表記が異なっても、ルート名前空間では同じROSトピックへ解決されるため重複として
+扱います。また、有効な複数の監視へ同じ`expected_component_id`を設定すると、送信元と監視行の対応が
+曖昧になるため起動を中止します。エラーに示されたパラメータを修正してから再起動してください。
 
 ### 5.2 自動テスト
 
