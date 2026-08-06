@@ -163,6 +163,11 @@ TEST(ComponentStatusValidationTest, ReportsSemanticInconsistencies) {
 }
 
 TEST(ComponentStatusValidationTest, RejectsUndefinedState) {
+	EXPECT_TRUE(yds::ros2::isDefinedComponentState(0));
+	EXPECT_TRUE(yds::ros2::isDefinedComponentState(7));
+	EXPECT_FALSE(yds::ros2::isDefinedComponentState(8));
+	EXPECT_FALSE(yds::ros2::isDefinedComponentState(255));
+
 	const auto result = yds::ros2::validateComponentStatus(
 		static_cast<yds::ros2::ComponentState>(99),
 		0,

@@ -95,16 +95,22 @@ ros2_qt_gui_node:
         display_name: Camera
         status_topic: camera/status
         timeout_ms: 3000
+        maximum_status_age_ms: 0
+        maximum_future_skew_ms: 0
       plc:
         enabled: true
         display_name: PLC
         status_topic: plc/status
         timeout_ms: 5000
+        maximum_status_age_ms: 0
+        maximum_future_skew_ms: 0
 ```
 
 `component_monitor_names`へ監視設定名を列挙し、`component_monitors`以下へ同じ名前の設定を記述します。
 この例ではcameraを3秒、PLCを5秒の受信タイムアウトで監視します。`enabled: false`の設定は
 Subscriptionを作成せず、監視対象から除外されます。
+`maximum_status_age_ms`と`maximum_future_skew_ms`はComponentStatusの生成時刻を検証する許容値で、
+`0`の場合は時計同期されていない装置を考慮して検証を無効にします。
 
 別の設定ファイルを指定できます。
 

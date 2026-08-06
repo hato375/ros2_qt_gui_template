@@ -81,6 +81,8 @@ Inactive中も死活確認のため定期通知を継続します。Lifecycle状
 同じROSパラメータを使用する場合は、`declareComponentStatusPublisherParameters()`で設定を解決します。
 ComponentStatusの定義外状態はPublisherで拒否します。状態とエラーコード、メッセージの意味的な不整合は
 警告しますが、設備固有のコード体系を壊さないよう共通層では自動修正しません。
+Supervisorは受信自体を死活監視へ記録したうえで、信頼できないComponentStatusを`UNKNOWN`へ縮退し、
+品質警告と通信タイムアウトを別のイベントとして扱います。
 物理設備を持たないロジック系ノードへの組み込み例は、`sample_processor`パッケージと
 `docs/sample_processor_guide.md`を参照してください。
 

@@ -10,11 +10,13 @@
 
 #include <QByteArray>
 #include <QDateTime>
+#include <QStringList>
 
 #include <rcl_interfaces/msg/integer_range.hpp>
 #include <rcl_interfaces/msg/parameter_descriptor.hpp>
 
 #include <yds/ros2/component_status_conversion.h>
+#include <yds/ros2/component_status_validation.h>
 
 namespace ros2qtgui {
 
@@ -31,7 +33,45 @@ constexpr char kDefaultPlcMonitorName[] = "plc";
 constexpr std::int64_t kDefaultTopicReceptionTimeoutMs = 3000;
 constexpr std::int64_t kMinimumTopicReceptionTimeoutMs = 500;
 constexpr std::int64_t kMaximumTopicReceptionTimeoutMs = 600000;
+constexpr std::int64_t kMaximumTimestampToleranceMs = 86400000;
 constexpr std::int64_t kTopicReceptionStatusUpdateIntervalMs = 200;
+
+enum ComponentStatusQualityIssue : std::uint32_t {
+	kNoQualityIssue = 0,
+	kEmptyComponentId = 1U << 0,
+	kUndefinedState = 1U << 1,
+	kUnexpectedErrorCode = 1U << 2,
+	kMissingErrorCode = 1U << 3,
+	kMissingMessage = 1U << 4,
+	kStaleTimestamp = 1U << 5,
+	kFutureTimestamp = 1U << 6,
+};
+
+QString componentStatusQualityIssueText(std::uint32_t issues) {
+	QStringList descriptions;
+	if ((issues & kEmptyComponentId) != 0U) {
+		descriptions.push_back(QStringLiteral("component ID is empty"));
+	}
+	if ((issues & kUndefinedState) != 0U) {
+		descriptions.push_back(QStringLiteral("state is undefined"));
+	}
+	if ((issues & kUnexpectedErrorCode) != 0U) {
+		descriptions.push_back(QStringLiteral("normal state has a non-zero error code"));
+	}
+	if ((issues & kMissingErrorCode) != 0U) {
+		descriptions.push_back(QStringLiteral("abnormal state has error code zero"));
+	}
+	if ((issues & kMissingMessage) != 0U) {
+		descriptions.push_back(QStringLiteral("abnormal state has an empty message"));
+	}
+	if ((issues & kStaleTimestamp) != 0U) {
+		descriptions.push_back(QStringLiteral("timestamp is too old"));
+	}
+	if ((issues & kFutureTimestamp) != 0U) {
+		descriptions.push_back(QStringLiteral("timestamp is too far in the future"));
+	}
+	return descriptions.join(QStringLiteral(", "));
+}
 
 rcl_interfaces::msg::ParameterDescriptor makeReadOnlyDescriptor(
 	const std::string& description) {
@@ -122,6 +162,7 @@ RosNode::RosNode(
 	  latestComponentStatuses_(),
 	  hasComponentStatuses_(),
 	  componentStatusDirty_(),
+	  componentStatusQualityIssues_(),
 	  heartbeatCount_(0),
 	  heartbeatTimer_(),
 	  monitoredTopicSubscriptions_(),
@@ -167,6 +208,20 @@ RosNode::RosNode(
 				"Topic reception timeout in milliseconds.",
 				kMinimumTopicReceptionTimeoutMs,
 				kMaximumTopicReceptionTimeoutMs));
+		const std::int64_t maximumStatusAgeMs = declare_parameter<std::int64_t>(
+			parameterPrefix + ".maximum_status_age_ms",
+			0,
+			makeReadOnlyIntegerDescriptor(
+				"Maximum component status age in milliseconds. Zero disables validation.",
+				0,
+				kMaximumTimestampToleranceMs));
+		const std::int64_t maximumFutureSkewMs = declare_parameter<std::int64_t>(
+			parameterPrefix + ".maximum_future_skew_ms",
+			0,
+			makeReadOnlyIntegerDescriptor(
+				"Maximum future timestamp skew in milliseconds. Zero disables validation.",
+				0,
+				kMaximumTimestampToleranceMs));
 
 		if (displayName.empty()) {
 			throw std::invalid_argument(parameterPrefix + ".display_name must not be empty");
@@ -182,12 +237,24 @@ RosNode::RosNode(
 			timeoutMs,
 			kMinimumTopicReceptionTimeoutMs,
 			kMaximumTopicReceptionTimeoutMs);
+		validateInterval(
+			parameterPrefix + ".maximum_status_age_ms",
+			maximumStatusAgeMs,
+			0,
+			kMaximumTimestampToleranceMs);
+		validateInterval(
+			parameterPrefix + ".maximum_future_skew_ms",
+			maximumFutureSkewMs,
+			0,
+			kMaximumTimestampToleranceMs);
 		if (enabled) {
 			componentMonitorConfigurations_.push_back({
 				QString::fromStdString(monitorName),
 				QString::fromStdString(displayName),
 				QString::fromStdString(topicName),
-				timeoutMs});
+				timeoutMs,
+				maximumStatusAgeMs,
+				maximumFutureSkewMs});
 		}
 	}
 	if (componentMonitorConfigurations_.empty()) {
@@ -201,6 +268,7 @@ RosNode::RosNode(
 	latestComponentStatuses_.reserve(componentMonitorConfigurations_.size());
 	hasComponentStatuses_.reserve(componentMonitorConfigurations_.size());
 	componentStatusDirty_.reserve(componentMonitorConfigurations_.size());
+	componentStatusQualityIssues_.reserve(componentMonitorConfigurations_.size());
 	monitoredTopicSubscriptions_.reserve(componentMonitorConfigurations_.size());
 	for (std::size_t index = 0; index < componentMonitorConfigurations_.size(); ++index) {
 		const auto& configuration = componentMonitorConfigurations_[index];
@@ -217,6 +285,7 @@ RosNode::RosNode(
 			QDateTime()});
 		hasComponentStatuses_.push_back(false);
 		componentStatusDirty_.push_back(false);
+		componentStatusQualityIssues_.push_back(kNoQualityIssue);
 		monitoredTopicSubscriptions_.push_back(
 			create_subscription<yds_interfaces::msg::ComponentStatus>(
 			configuration.statusTopicName.toStdString(),
@@ -243,11 +312,14 @@ RosNode::RosNode(
 		const QByteArray topicNameUtf8 = configuration.statusTopicName.toUtf8();
 		RCLCPP_INFO(
 			get_logger(),
-			"Component monitor enabled: name=%s, display_name=%s, topic=%s, timeout_ms=%ld",
+			"Component monitor enabled: name=%s, display_name=%s, topic=%s, timeout_ms=%ld, "
+			"maximum_status_age_ms=%ld, maximum_future_skew_ms=%ld",
 			monitorNameUtf8.constData(),
 			displayNameUtf8.constData(),
 			topicNameUtf8.constData(),
-			static_cast<long>(configuration.timeoutMs));
+			static_cast<long>(configuration.timeoutMs),
+			static_cast<long>(configuration.maximumStatusAgeMs),
+			static_cast<long>(configuration.maximumFutureSkewMs));
 	}
 	RCLCPP_INFO(get_logger(), "ROS 2 node started");
 }
@@ -291,11 +363,75 @@ void RosNode::onMonitoredTopic(
 		auto& monitor = *topicReceptionMonitors_.at(monitorIndex);
 		const auto previousStatus = latestComponentStatuses_.at(monitorIndex);
 		const bool hasPreviousStatus = hasComponentStatuses_.at(monitorIndex);
+		const auto& configuration = componentMonitorConfigurations_.at(monitorIndex);
+		const QDateTime receivedAt = QDateTime::currentDateTime();
 		auto status =
 			yds::ros2::componentStatusFromRos(monitor.status().topicName, *message);
-		if (!status.timestamp.isValid()) {
-			status.timestamp = QDateTime::currentDateTime();
+		std::uint32_t qualityIssues = kNoQualityIssue;
+		if (status.componentId.trimmed().isEmpty()) {
+			qualityIssues |= kEmptyComponentId;
 		}
+		if (!yds::ros2::isDefinedComponentState(message->state)) {
+			qualityIssues |= kUndefinedState;
+		} else {
+			const auto validation = yds::ros2::validateComponentStatus(
+				status.state,
+				status.errorCode,
+				status.message);
+			if (validation.unexpectedErrorCode) {
+				qualityIssues |= kUnexpectedErrorCode;
+			}
+			if (validation.missingErrorCode) {
+				qualityIssues |= kMissingErrorCode;
+			}
+			if (validation.missingMessage) {
+				qualityIssues |= kMissingMessage;
+			}
+		}
+		const bool hasSourceTimestamp = status.timestamp.isValid();
+		if (hasSourceTimestamp && configuration.maximumStatusAgeMs > 0 &&
+			status.timestamp.msecsTo(receivedAt) > configuration.maximumStatusAgeMs) {
+			qualityIssues |= kStaleTimestamp;
+		}
+		if (hasSourceTimestamp && configuration.maximumFutureSkewMs > 0 &&
+			receivedAt.msecsTo(status.timestamp) > configuration.maximumFutureSkewMs) {
+			qualityIssues |= kFutureTimestamp;
+		}
+		if (!status.timestamp.isValid()) {
+			status.timestamp = receivedAt;
+		}
+
+		const std::uint32_t previousQualityIssues =
+			componentStatusQualityIssues_.at(monitorIndex);
+		if (qualityIssues != kNoQualityIssue) {
+			status.state = yds::ros2::ComponentState::kUnknown;
+		}
+		if (qualityIssues != previousQualityIssues) {
+			const QByteArray topicNameUtf8 = monitor.status().topicName.toUtf8();
+			if (qualityIssues != kNoQualityIssue) {
+				const QString issueText = componentStatusQualityIssueText(qualityIssues);
+				const QByteArray issueTextUtf8 = issueText.toUtf8();
+				RCLCPP_WARN(
+					get_logger(),
+					"Component status quality warning: topic=%s, issues=%s",
+					topicNameUtf8.constData(),
+					issueTextUtf8.constData());
+				reportApplicationEvent(
+					yds::ros2::ApplicationEventLevel::kWarning,
+					QStringLiteral("Component status quality warning: topic=%1, issues=%2")
+						.arg(monitor.status().topicName, issueText));
+			} else {
+				RCLCPP_INFO(
+					get_logger(),
+					"Component status quality recovered: topic=%s",
+					topicNameUtf8.constData());
+				reportApplicationEvent(
+					yds::ros2::ApplicationEventLevel::kInfo,
+					QStringLiteral("Component status quality recovered: topic=%1")
+						.arg(monitor.status().topicName));
+			}
+		}
+		componentStatusQualityIssues_.at(monitorIndex) = qualityIssues;
 		latestComponentStatuses_.at(monitorIndex) = status;
 		hasComponentStatuses_.at(monitorIndex) = true;
 		componentStatusDirty_.at(monitorIndex) = true;

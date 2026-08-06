@@ -1,11 +1,16 @@
 #pragma once
 
+#include <cstdint>
+
 #include <QtGlobal>
 #include <QString>
 
 #include <yds/ros2/component_status.h>
 
 namespace yds::ros2 {
+
+/// @brief ROSメッセージの状態値がComponentStatusで定義済みか確認する
+bool isDefinedComponentState(std::uint8_t state) noexcept;
 
 /// @brief コンポーネント状態値の検証結果
 struct ComponentStatusValidationResult {

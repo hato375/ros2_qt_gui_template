@@ -1,6 +1,24 @@
 #include <yds/ros2/component_status_validation.h>
 
+#include <yds_interfaces/msg/component_status.hpp>
+
 namespace yds::ros2 {
+
+bool isDefinedComponentState(std::uint8_t state) noexcept {
+	switch (state) {
+	case yds_interfaces::msg::ComponentStatus::STATE_UNKNOWN:
+	case yds_interfaces::msg::ComponentStatus::STATE_INITIALIZING:
+	case yds_interfaces::msg::ComponentStatus::STATE_READY:
+	case yds_interfaces::msg::ComponentStatus::STATE_RUNNING:
+	case yds_interfaces::msg::ComponentStatus::STATE_WARNING:
+	case yds_interfaces::msg::ComponentStatus::STATE_ERROR:
+	case yds_interfaces::msg::ComponentStatus::STATE_CRITICAL:
+	case yds_interfaces::msg::ComponentStatus::STATE_STOPPED:
+		return true;
+	default:
+		return false;
+	}
+}
 
 bool ComponentStatusValidationResult::hasConsistencyWarning() const noexcept {
 	return unexpectedErrorCode || missingErrorCode || missingMessage;

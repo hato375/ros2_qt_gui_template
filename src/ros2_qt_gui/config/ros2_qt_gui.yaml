@@ -11,8 +11,12 @@ ros2_qt_gui_node:
         display_name: Camera
         status_topic: camera/status
         timeout_ms: 3000
+        maximum_status_age_ms: 0
+        maximum_future_skew_ms: 0
       plc:
         enabled: true
         display_name: PLC
         status_topic: plc/status
         timeout_ms: 5000
+        maximum_status_age_ms: 0
+        maximum_future_skew_ms: 0

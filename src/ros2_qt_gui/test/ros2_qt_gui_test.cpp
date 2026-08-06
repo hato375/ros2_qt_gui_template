@@ -4,6 +4,7 @@
 #include <memory>
 #include <string>
 #include <thread>
+#include <vector>
 
 #include <QApplication>
 #include <QColor>
@@ -23,6 +24,7 @@
 #include <yds_interfaces/msg/component_status.hpp>
 
 #include <yds/ros2/component_status_publisher.h>
+#include <yds/ros2/component_status_conversion.h>
 #include <yds/ros2/executor_runner.h>
 
 #include "main_window.h"
@@ -73,13 +75,15 @@ public:
 			  yds::ros2::ApplicationEventLevel::kInfo,
 			  QDateTime(),
 			  QString()}),
-		  receiverThread_(nullptr) {
+		  receiverThread_(nullptr),
+		  events_() {
 	}
 
 	void receiveApplicationEvent(const yds::ros2::ApplicationEvent& event) {
 		++receivedCount_;
 		lastEvent_ = event;
 		receiverThread_ = QThread::currentThread();
+		events_.push_back(event);
 	}
 
 	int receivedCount() const noexcept {
@@ -94,10 +98,21 @@ public:
 		return receiverThread_;
 	}
 
+	int eventCountContaining(const QString& text) const noexcept {
+		int count = 0;
+		for (const auto& event : events_) {
+			if (event.message.contains(text)) {
+				++count;
+			}
+		}
+		return count;
+	}
+
 private:
 	int receivedCount_;
 	yds::ros2::ApplicationEvent lastEvent_;
 	const QThread* receiverThread_;
+	std::vector<yds::ros2::ApplicationEvent> events_;
 };
 
 class TopicReceptionStatusReceiver final : public QObject {
@@ -662,6 +677,8 @@ TEST(RosNodeParameterTest, UsesDefaultValues) {
 	EXPECT_EQ(configurations[0].displayName, QStringLiteral("camera"));
 	EXPECT_EQ(configurations[0].statusTopicName, QStringLiteral("camera/status"));
 	EXPECT_EQ(configurations[0].timeoutMs, 3000);
+	EXPECT_EQ(configurations[0].maximumStatusAgeMs, 0);
+	EXPECT_EQ(configurations[0].maximumFutureSkewMs, 0);
 	EXPECT_EQ(configurations[1].name, QStringLiteral("plc"));
 	EXPECT_EQ(configurations[1].displayName, QStringLiteral("plc"));
 	EXPECT_EQ(configurations[1].statusTopicName, QStringLiteral("plc/status"));
@@ -684,6 +701,8 @@ TEST(RosNodeParameterTest, UsesOverrideValues) {
 		rclcpp::Parameter("component_monitors.robot.display_name", "Robot controller"),
 		rclcpp::Parameter("component_monitors.robot.status_topic", "robot/health"),
 		rclcpp::Parameter("component_monitors.robot.timeout_ms", 7000),
+		rclcpp::Parameter("component_monitors.robot.maximum_status_age_ms", 5000),
+		rclcpp::Parameter("component_monitors.robot.maximum_future_skew_ms", 1000),
 	});
 	auto node = std::make_shared<ros2qtgui::RosNode>(
 		[](std::uint64_t) {
@@ -701,6 +720,8 @@ TEST(RosNodeParameterTest, UsesOverrideValues) {
 	EXPECT_EQ(configurations[0].displayName, QStringLiteral("Robot controller"));
 	EXPECT_EQ(configurations[0].statusTopicName, QStringLiteral("robot/health"));
 	EXPECT_EQ(configurations[0].timeoutMs, 7000);
+	EXPECT_EQ(configurations[0].maximumStatusAgeMs, 5000);
+	EXPECT_EQ(configurations[0].maximumFutureSkewMs, 1000);
 }
 
 TEST(RosNodeParameterTest, RejectsOutOfRangeValues) {
@@ -825,6 +846,20 @@ TEST(RosNodeParameterTest, RejectsInvalidComponentMonitorParameters) {
 			timeoutOptions);
 	});
 
+	rclcpp::NodeOptions timestampToleranceOptions;
+	timestampToleranceOptions.parameter_overrides({
+		rclcpp::Parameter("component_monitors.camera.maximum_status_age_ms", 86400001),
+	});
+	EXPECT_ANY_THROW({
+		auto node = std::make_shared<ros2qtgui::RosNode>(
+			[](std::uint64_t) {
+			},
+			ros2qtgui::RosNode::ApplicationEventCallback(),
+			ros2qtgui::RosNode::TopicReceptionStatusCallback(),
+			ros2qtgui::RosNode::ComponentStatusCallback(),
+			timestampToleranceOptions);
+	});
+
 	rclcpp::NodeOptions allDisabledOptions;
 	allDisabledOptions.parameter_overrides({
 		rclcpp::Parameter("component_monitors.camera.enabled", false),
@@ -863,6 +898,128 @@ TEST(ExecutorRunnerIntegrationTest, DeliversHeartbeatAndStopsSafely) {
 	EXPECT_EQ(receiver.receiverThread(), QThread::currentThread());
 
 	executorRunner.stop();
+	executorRunner.stop();
+}
+
+TEST(ComponentStatusQualityIntegrationTest, DegradesInvalidValuesAndReportsRecovery) {
+	using namespace std::chrono_literals;
+
+	rclcpp::NodeOptions options;
+	options.parameter_overrides({
+		rclcpp::Parameter("gui_status_check_interval_ms", 100),
+		rclcpp::Parameter(
+			"component_monitor_names",
+			std::vector<std::string>{"quality"}),
+		rclcpp::Parameter("component_monitors.quality.enabled", true),
+		rclcpp::Parameter(
+			"component_monitors.quality.status_topic",
+			"quality/status"),
+		rclcpp::Parameter("component_monitors.quality.timeout_ms", 1000),
+		rclcpp::Parameter("component_monitors.quality.maximum_status_age_ms", 1000),
+		rclcpp::Parameter("component_monitors.quality.maximum_future_skew_ms", 1000),
+	});
+
+	ros2qtgui::RosQtBridge bridge;
+	TopicReceptionStatusReceiver receptionReceiver;
+	ComponentStatusReceiver componentReceiver;
+	ApplicationEventReceiver eventReceiver;
+	QObject::connect(
+		&bridge,
+		&ros2qtgui::RosQtBridge::topicReceptionStatusUpdated,
+		&receptionReceiver,
+		&TopicReceptionStatusReceiver::receiveTopicReceptionStatus,
+		Qt::QueuedConnection);
+	QObject::connect(
+		&bridge,
+		&ros2qtgui::RosQtBridge::componentStatusUpdated,
+		&componentReceiver,
+		&ComponentStatusReceiver::receiveComponentStatus,
+		Qt::QueuedConnection);
+	QObject::connect(
+		&bridge,
+		&ros2qtgui::RosQtBridge::applicationEventOccurred,
+		&eventReceiver,
+		&ApplicationEventReceiver::receiveApplicationEvent,
+		Qt::QueuedConnection);
+
+	auto node = std::make_shared<ros2qtgui::RosNode>(
+		[](std::uint64_t) {
+		},
+		[&bridge](const yds::ros2::ApplicationEvent& event) {
+			bridge.notifyApplicationEvent(event);
+		},
+		[&bridge](const yds::ros2::TopicReceptionStatus& status) {
+			bridge.notifyTopicReceptionStatus(status);
+		},
+		[&bridge](const yds::ros2::ComponentStatus& status) {
+			bridge.notifyComponentStatus(status);
+		},
+		options);
+	const auto publisher =
+		node->create_publisher<yds_interfaces::msg::ComponentStatus>("quality/status", 10);
+	yds::ros2::ExecutorRunner executorRunner(node);
+	const QString topicName = QStringLiteral("quality/status");
+	std::uint64_t expectedReceivedCount = 0;
+	const auto publishAndWait = [&](const yds_interfaces::msg::ComponentStatus& message) {
+		++expectedReceivedCount;
+		publisher->publish(message);
+		return waitFor([&]() {
+			return receptionReceiver.hasStatus(topicName) &&
+				receptionReceiver.status(topicName).receivedCount >= expectedReceivedCount;
+		}, 1000);
+	};
+
+	yds_interfaces::msg::ComponentStatus message;
+	message.component_id = "quality-1";
+	message.state = yds_interfaces::msg::ComponentStatus::STATE_READY;
+	message.message = "Ready";
+	EXPECT_TRUE(publishAndWait(message));
+	EXPECT_EQ(componentReceiver.status(topicName).state, yds::ros2::ComponentState::kReady);
+	EXPECT_TRUE(componentReceiver.status(topicName).timestamp.isValid());
+
+	message.component_id = " ";
+	message.state = 99;
+	message.header.stamp = yds::ros2::dateTimeToRos(
+		QDateTime::currentDateTime().addMSecs(-5000));
+	EXPECT_TRUE(publishAndWait(message));
+	EXPECT_EQ(componentReceiver.status(topicName).state, yds::ros2::ComponentState::kUnknown);
+	EXPECT_EQ(
+		receptionReceiver.status(topicName).state,
+		yds::ros2::TopicReceptionState::kReceiving);
+	EXPECT_TRUE(waitFor([&]() {
+		return eventReceiver.eventCountContaining(
+			QStringLiteral("Component status quality warning")) >= 1;
+	}, 1000));
+	const int repeatedWarningCount = eventReceiver.eventCountContaining(
+		QStringLiteral("Component status quality warning"));
+	EXPECT_TRUE(publishAndWait(message));
+	QCoreApplication::processEvents(QEventLoop::AllEvents, 200);
+	EXPECT_EQ(
+		eventReceiver.eventCountContaining(
+			QStringLiteral("Component status quality warning")),
+		repeatedWarningCount);
+
+	message.component_id = "quality-1";
+	message.state = yds_interfaces::msg::ComponentStatus::STATE_RUNNING;
+	message.error_code = 12;
+	message.header.stamp = yds::ros2::dateTimeToRos(QDateTime::currentDateTime());
+	EXPECT_TRUE(publishAndWait(message));
+	EXPECT_EQ(componentReceiver.status(topicName).state, yds::ros2::ComponentState::kUnknown);
+
+	message.error_code = 0;
+	message.header.stamp = yds::ros2::dateTimeToRos(
+		QDateTime::currentDateTime().addMSecs(5000));
+	EXPECT_TRUE(publishAndWait(message));
+	EXPECT_EQ(componentReceiver.status(topicName).state, yds::ros2::ComponentState::kUnknown);
+
+	message.header.stamp = yds::ros2::dateTimeToRos(QDateTime::currentDateTime());
+	EXPECT_TRUE(publishAndWait(message));
+	EXPECT_EQ(componentReceiver.status(topicName).state, yds::ros2::ComponentState::kRunning);
+	EXPECT_TRUE(waitFor([&]() {
+		return eventReceiver.eventCountContaining(
+			QStringLiteral("Component status quality recovered")) >= 1;
+	}, 1000));
+
 	executorRunner.stop();
 }
 

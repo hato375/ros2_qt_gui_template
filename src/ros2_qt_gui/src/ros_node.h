@@ -28,6 +28,10 @@ struct ComponentMonitorConfiguration {
 	QString statusTopicName;
 	/// @brief 受信タイムアウト時間（ミリ秒）
 	std::int64_t timeoutMs;
+	/// @brief 許容する状態生成時刻の古さ。0は検証無効
+	std::int64_t maximumStatusAgeMs;
+	/// @brief 許容する未来方向の時刻ずれ。0は検証無効
+	std::int64_t maximumFutureSkewMs;
 };
 
 /// @brief GUIと連携するROS 2ノード
@@ -100,6 +104,7 @@ private:
 	std::vector<yds::ros2::ComponentStatus> latestComponentStatuses_;
 	std::vector<bool> hasComponentStatuses_;
 	std::vector<bool> componentStatusDirty_;
+	std::vector<std::uint32_t> componentStatusQualityIssues_;
 	std::uint64_t heartbeatCount_;
 	rclcpp::TimerBase::SharedPtr heartbeatTimer_;
 	std::vector<rclcpp::Subscription<yds_interfaces::msg::ComponentStatus>::SharedPtr>

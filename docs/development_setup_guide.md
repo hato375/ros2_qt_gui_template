@@ -179,6 +179,8 @@ src/ros2_qt_gui/config/ros2_qt_gui.yaml
 | `component_monitors.<name>.display_name` | `<name>` | 空文字不可 | GUIに表示するコンポーネント名 |
 | `component_monitors.<name>.status_topic` | `<name>/status` | 空・重複不可 | 監視するコンポーネント状態トピック |
 | `component_monitors.<name>.timeout_ms` | camera: 3000、PLC: 5000 | 500～600000 | 個別の受信タイムアウト時間 |
+| `component_monitors.<name>.maximum_status_age_ms` | 0 | 0～86400000 | 状態生成時刻の許容経過時間。0で検証無効 |
+| `component_monitors.<name>.maximum_future_skew_ms` | 0 | 0～86400000 | 未来方向の許容時刻ずれ。0で検証無効 |
 
 パラメータは起動時に確定する読み取り専用設定です。別のYAMLを指定する場合は次のように起動します。
 
@@ -224,6 +226,7 @@ colcon test --packages-select yds_interfaces yds_ros2 yds_ros2_widgets ros2_qt_g
 - 共通の`ComponentStatusNode`が状態変更時と設定周期で最新のコンポーネント状態を通知する
 - 共通の`ComponentStatusPublisher`を通常のROSノードへ組み込める
 - Lifecycle Nodeの状態通知、Inactive中の受信継続、タイムアウト、および復旧をSupervisorまで検証する
+- 不正なComponentStatusを`UNKNOWN`へ縮退し、品質警告の抑制と復旧を通知する
 - ロジック系サンプルノードが`INITIALIZING`、`READY`、`RUNNING`を通知する
 - Executorを複数回停止しても安全に終了する
 - パラメータの既定値と上書き値が適用される

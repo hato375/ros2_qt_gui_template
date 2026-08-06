@@ -10,3 +10,5 @@ ros2_qt_gui_node:
         display_name: Sample lifecycle processor
         status_topic: sample_lifecycle_processor/status
         timeout_ms: 3000
+        maximum_status_age_ms: 0
+        maximum_future_skew_ms: 0
