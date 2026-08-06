@@ -223,6 +223,7 @@ colcon test --packages-select yds_interfaces yds_ros2 yds_ros2_widgets ros2_qt_g
 - 共通の`TopicReceptionMonitor`が最新値だけを保持し、状態遷移を通知する
 - 共通の`ComponentStatusNode`が状態変更時と設定周期で最新のコンポーネント状態を通知する
 - 共通の`ComponentStatusPublisher`を通常のROSノードへ組み込める
+- Lifecycle Nodeの状態通知、Inactive中の受信継続、タイムアウト、および復旧をSupervisorまで検証する
 - ロジック系サンプルノードが`INITIALIZING`、`READY`、`RUNNING`を通知する
 - Executorを複数回停止しても安全に終了する
 - パラメータの既定値と上書き値が適用される

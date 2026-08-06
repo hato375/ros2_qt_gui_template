@@ -40,6 +40,7 @@ endif()
 
 if(BUILD_TESTING)
 	find_package(ament_cmake_gtest REQUIRED)
+	find_package(rclcpp_lifecycle REQUIRED)
 
 	ament_add_gtest(ros2_qt_gui_test
 		SKIP_LINKING_MAIN_LIBRARIES
@@ -56,7 +57,13 @@ if(BUILD_TESTING)
 		yds_ros2::yds_ros2
 		yds_ros2_widgets::yds_ros2_widgets
 	)
-	ament_target_dependencies(ros2_qt_gui_test rcl_interfaces rclcpp yds_interfaces)
+	ament_target_dependencies(
+		ros2_qt_gui_test
+		rcl_interfaces
+		rclcpp
+		rclcpp_lifecycle
+		yds_interfaces
+	)
 
 	if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
 		target_compile_options(ros2_qt_gui_test PRIVATE -Wall -Wextra -Wpedantic)

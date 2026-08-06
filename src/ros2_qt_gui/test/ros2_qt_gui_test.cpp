@@ -19,8 +19,10 @@
 
 #include <gtest/gtest.h>
 #include <rclcpp/rclcpp.hpp>
+#include <rclcpp_lifecycle/lifecycle_node.hpp>
 #include <yds_interfaces/msg/component_status.hpp>
 
+#include <yds/ros2/component_status_publisher.h>
 #include <yds/ros2/executor_runner.h>
 
 #include "main_window.h"
@@ -205,6 +207,42 @@ bool waitFor(const std::function<bool()>& condition, int timeoutMilliseconds) {
 	}
 	return condition();
 }
+
+class LifecycleStatusIntegrationNode final : public rclcpp_lifecycle::LifecycleNode {
+public:
+	LifecycleStatusIntegrationNode()
+		: rclcpp_lifecycle::LifecycleNode("lifecycle_status_integration_node"),
+		  statusPublisher_(
+			  *this,
+			  {
+				  QStringLiteral("lifecycle-integration-1"),
+				  QStringLiteral("lifecycle_integration/status"),
+				  std::chrono::milliseconds(100)}) {}
+
+protected:
+	CallbackReturn on_configure(const rclcpp_lifecycle::State&) override {
+		return setStatus(yds::ros2::ComponentState::kReady, QStringLiteral("Configured"));
+	}
+
+	CallbackReturn on_activate(const rclcpp_lifecycle::State&) override {
+		return setStatus(yds::ros2::ComponentState::kRunning, QStringLiteral("Active"));
+	}
+
+	CallbackReturn on_deactivate(const rclcpp_lifecycle::State&) override {
+		return setStatus(yds::ros2::ComponentState::kStopped, QStringLiteral("Inactive"));
+	}
+
+private:
+	CallbackReturn setStatus(
+		yds::ros2::ComponentState state,
+		const QString& message) noexcept {
+		return statusPublisher_.setStatus(state, 0, message)
+			? CallbackReturn::SUCCESS
+			: CallbackReturn::ERROR;
+	}
+
+	yds::ros2::ComponentStatusPublisher statusPublisher_;
+};
 
 TEST(RosQtBridgeTest, DeliversNotificationOnQtThread) {
 	ros2qtgui::RosQtBridge bridge;
@@ -826,6 +864,124 @@ TEST(ExecutorRunnerIntegrationTest, DeliversHeartbeatAndStopsSafely) {
 
 	executorRunner.stop();
 	executorRunner.stop();
+}
+
+TEST(LifecycleSupervisorIntegrationTest, MonitorsLifecycleStatesTimeoutAndRecovery) {
+	using namespace std::chrono_literals;
+
+	rclcpp::NodeOptions options;
+	options.parameter_overrides({
+		rclcpp::Parameter("gui_status_check_interval_ms", 100),
+		rclcpp::Parameter(
+			"component_monitor_names",
+			std::vector<std::string>{"lifecycle"}),
+		rclcpp::Parameter("component_monitors.lifecycle.enabled", true),
+		rclcpp::Parameter(
+			"component_monitors.lifecycle.display_name",
+			"Lifecycle integration"),
+		rclcpp::Parameter(
+			"component_monitors.lifecycle.status_topic",
+			"lifecycle_integration/status"),
+		rclcpp::Parameter("component_monitors.lifecycle.timeout_ms", 500),
+	});
+
+	ros2qtgui::RosQtBridge bridge;
+	TopicReceptionStatusReceiver receptionReceiver;
+	ComponentStatusReceiver componentReceiver;
+	QObject::connect(
+		&bridge,
+		&ros2qtgui::RosQtBridge::topicReceptionStatusUpdated,
+		&receptionReceiver,
+		&TopicReceptionStatusReceiver::receiveTopicReceptionStatus,
+		Qt::QueuedConnection);
+	QObject::connect(
+		&bridge,
+		&ros2qtgui::RosQtBridge::componentStatusUpdated,
+		&componentReceiver,
+		&ComponentStatusReceiver::receiveComponentStatus,
+		Qt::QueuedConnection);
+
+	auto supervisorNode = std::make_shared<ros2qtgui::RosNode>(
+		[](std::uint64_t) {
+		},
+		ros2qtgui::RosNode::ApplicationEventCallback(),
+		[&bridge](const yds::ros2::TopicReceptionStatus& status) {
+			bridge.notifyTopicReceptionStatus(status);
+		},
+		[&bridge](const yds::ros2::ComponentStatus& status) {
+			bridge.notifyComponentStatus(status);
+		},
+		options);
+	auto lifecycleNode = std::make_shared<LifecycleStatusIntegrationNode>();
+	yds::ros2::ExecutorRunner supervisorExecutor(supervisorNode);
+
+	std::unique_ptr<rclcpp::executors::SingleThreadedExecutor> lifecycleExecutor;
+	std::thread lifecycleExecutorThread;
+	const auto startLifecycleExecutor = [&]() {
+		lifecycleExecutor =
+			std::make_unique<rclcpp::executors::SingleThreadedExecutor>();
+		lifecycleExecutor->add_node(lifecycleNode->get_node_base_interface());
+		lifecycleExecutorThread = std::thread([&lifecycleExecutor]() {
+			lifecycleExecutor->spin();
+		});
+	};
+	const auto stopLifecycleExecutor = [&]() {
+		lifecycleExecutor->cancel();
+		lifecycleExecutorThread.join();
+		lifecycleExecutor.reset();
+	};
+	startLifecycleExecutor();
+
+	const QString topicName = QStringLiteral("lifecycle_integration/status");
+	EXPECT_TRUE(waitFor([&]() {
+		return componentReceiver.hasStatus(topicName) &&
+			componentReceiver.status(topicName).state ==
+				yds::ros2::ComponentState::kInitializing &&
+			receptionReceiver.status(topicName).state ==
+				yds::ros2::TopicReceptionState::kReceiving;
+	}, 1500));
+
+	lifecycleNode->configure();
+	EXPECT_TRUE(waitFor([&]() {
+		return componentReceiver.status(topicName).state ==
+			yds::ros2::ComponentState::kReady;
+	}, 1000));
+	lifecycleNode->activate();
+	EXPECT_TRUE(waitFor([&]() {
+		return componentReceiver.status(topicName).state ==
+			yds::ros2::ComponentState::kRunning;
+	}, 1000));
+	lifecycleNode->deactivate();
+	EXPECT_TRUE(waitFor([&]() {
+		return componentReceiver.status(topicName).state ==
+			yds::ros2::ComponentState::kStopped;
+	}, 1000));
+
+	const quint64 inactiveReceivedCount = receptionReceiver.status(topicName).receivedCount;
+	EXPECT_TRUE(waitFor([&]() {
+		const auto status = receptionReceiver.status(topicName);
+		return status.state == yds::ros2::TopicReceptionState::kReceiving &&
+			status.receivedCount > inactiveReceivedCount;
+	}, 1000));
+
+	stopLifecycleExecutor();
+	EXPECT_TRUE(waitFor([&]() {
+		return receptionReceiver.status(topicName).state ==
+			yds::ros2::TopicReceptionState::kTimedOut;
+	}, 1500));
+
+	const quint64 timedOutReceivedCount = receptionReceiver.status(topicName).receivedCount;
+	startLifecycleExecutor();
+	EXPECT_TRUE(waitFor([&]() {
+		const auto status = receptionReceiver.status(topicName);
+		return status.state == yds::ros2::TopicReceptionState::kReceiving &&
+			status.receivedCount > timedOutReceivedCount &&
+			componentReceiver.status(topicName).state ==
+				yds::ros2::ComponentState::kStopped;
+	}, 1500));
+
+	stopLifecycleExecutor();
+	supervisorExecutor.stop();
 }
 
 TEST(TopicReceptionIntegrationTest, ReportsIndividualTimeoutAndRecovery) {
