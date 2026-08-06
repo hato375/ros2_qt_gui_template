@@ -93,6 +93,62 @@ private:
 	bool throwNextActivation_ = true;
 };
 
+class DeactivateFailureNode final
+	: public sampleprocessor::SampleLifecycleProcessorNode {
+public:
+	using SampleLifecycleProcessorNode::SampleLifecycleProcessorNode;
+
+protected:
+	bool deactivateProcessor(QString& errorMessage) override {
+		if (!failNextDeactivation_) {
+			return true;
+		}
+		failNextDeactivation_ = false;
+		errorMessage = QStringLiteral("Robot stop confirmation failed");
+		return false;
+	}
+
+private:
+	bool failNextDeactivation_ = true;
+};
+
+class CleanupExceptionNode final
+	: public sampleprocessor::SampleLifecycleProcessorNode {
+public:
+	using SampleLifecycleProcessorNode::SampleLifecycleProcessorNode;
+
+protected:
+	bool cleanupProcessor(QString&) override {
+		if (throwNextCleanup_) {
+			throwNextCleanup_ = false;
+			throw std::runtime_error("camera resource release failed");
+		}
+		return true;
+	}
+
+private:
+	bool throwNextCleanup_ = true;
+};
+
+class ShutdownFailureNode final
+	: public sampleprocessor::SampleLifecycleProcessorNode {
+public:
+	using SampleLifecycleProcessorNode::SampleLifecycleProcessorNode;
+
+protected:
+	bool shutdownProcessor(QString& errorMessage) override {
+		if (!failNextShutdown_) {
+			return true;
+		}
+		failNextShutdown_ = false;
+		errorMessage = QStringLiteral("PLC shutdown acknowledgement failed");
+		return false;
+	}
+
+private:
+	bool failNextShutdown_ = true;
+};
+
 TEST(SampleLifecycleProcessorNodeTest, RejectsInvalidProcessingInterval) {
 	rclcpp::NodeOptions options;
 	options.parameter_overrides({
@@ -321,6 +377,67 @@ TEST(SampleLifecycleProcessorNodeTest, HandlesActivateUnknownExceptionAndRecover
 	node->activate();
 	EXPECT_EQ(node->get_current_state().label(), "active");
 	EXPECT_EQ(node->componentStatus().state, yds::ros2::ComponentState::kRunning);
+	EXPECT_EQ(node->componentStatus().errorCode, 0);
+}
+
+TEST(SampleLifecycleProcessorNodeTest, ReportsDeactivateFailureAndRecovers) {
+	auto node = std::make_shared<DeactivateFailureNode>();
+
+	node->configure();
+	node->activate();
+	ASSERT_EQ(node->get_current_state().label(), "active");
+	node->deactivate();
+	EXPECT_EQ(node->get_current_state().label(), "unconfigured");
+	EXPECT_EQ(node->componentStatus().state, yds::ros2::ComponentState::kError);
+	EXPECT_EQ(node->componentStatus().errorCode, 9103);
+	EXPECT_EQ(
+		node->componentStatus().message,
+		QStringLiteral("Robot stop confirmation failed"));
+
+	node->configure();
+	node->activate();
+	node->deactivate();
+	EXPECT_EQ(node->get_current_state().label(), "inactive");
+	EXPECT_EQ(node->componentStatus().state, yds::ros2::ComponentState::kStopped);
+	EXPECT_EQ(node->componentStatus().errorCode, 0);
+}
+
+TEST(SampleLifecycleProcessorNodeTest, HandlesCleanupExceptionAndRecovers) {
+	auto node = std::make_shared<CleanupExceptionNode>();
+
+	node->configure();
+	ASSERT_EQ(node->get_current_state().label(), "inactive");
+	EXPECT_NO_THROW(node->cleanup());
+	EXPECT_EQ(node->get_current_state().label(), "unconfigured");
+	EXPECT_EQ(node->componentStatus().state, yds::ros2::ComponentState::kError);
+	EXPECT_EQ(node->componentStatus().errorCode, 9104);
+	EXPECT_EQ(
+		node->componentStatus().message,
+		QStringLiteral("Processor cleanup raised an exception"));
+
+	node->configure();
+	node->cleanup();
+	EXPECT_EQ(node->get_current_state().label(), "unconfigured");
+	EXPECT_EQ(
+		node->componentStatus().state,
+		yds::ros2::ComponentState::kInitializing);
+	EXPECT_EQ(node->componentStatus().errorCode, 0);
+}
+
+TEST(SampleLifecycleProcessorNodeTest, ReportsShutdownFailureAndAllowsRetry) {
+	auto node = std::make_shared<ShutdownFailureNode>();
+
+	node->shutdown();
+	EXPECT_EQ(node->get_current_state().label(), "unconfigured");
+	EXPECT_EQ(node->componentStatus().state, yds::ros2::ComponentState::kError);
+	EXPECT_EQ(node->componentStatus().errorCode, 9105);
+	EXPECT_EQ(
+		node->componentStatus().message,
+		QStringLiteral("PLC shutdown acknowledgement failed"));
+
+	node->shutdown();
+	EXPECT_EQ(node->get_current_state().label(), "finalized");
+	EXPECT_EQ(node->componentStatus().state, yds::ros2::ComponentState::kStopped);
 	EXPECT_EQ(node->componentStatus().errorCode, 0);
 }
 

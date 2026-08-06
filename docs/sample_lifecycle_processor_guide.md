@@ -16,6 +16,9 @@
 | shutdown | `STOPPED` | 停止 |
 | configure失敗 | `ERROR`、エラーコード`9101` | 停止 |
 | activate失敗 | `ERROR`、エラーコード`9102` | 停止 |
+| deactivate失敗 | `ERROR`、エラーコード`9103` | 停止 |
+| cleanup失敗 | `ERROR`、エラーコード`9104` | 停止 |
+| shutdown失敗 | `ERROR`、エラーコード`9105` | 停止 |
 | その他のerror処理 | `ERROR`、エラーコード`9001` | 停止 |
 
 ComponentStatusの定期通知は処理タイマーとは別に動作します。このため、Lifecycle NodeがInactiveで
@@ -114,6 +117,19 @@ activate失敗後も、configureから再実行して`READY`、`RUNNING`の順�
 `std::exception`とその他の例外を境界で捕捉します。例外の詳細は原因調査用としてROSログに記録し、
 ComponentStatusには内部情報を含まない定型メッセージを設定します。エラーコードは処理が`false`を
 返した場合と同じく、configureでは`9101`、activateでは`9102`です。例外後の復旧手順も同じです。
+
+終了側の設備固有処理は、目的ごとに次のフックへ分けます。
+
+| フック | 用途 | 呼び出し時のLifecycle状態 |
+|---|---|---|
+| `deactivateProcessor()` | 動作の安全停止、停止完了確認 | Activeからのdeactivate |
+| `cleanupProcessor()` | 接続切断、設定済み資源の解放 | Inactiveからのcleanup |
+| `shutdownProcessor()` | 遷移元に依存しない最終終了処理 | shutdown |
+
+処理タイマーは各フックより先に停止します。フックが`false`を返した場合や例外を送出した場合は
+ComponentStatusを`ERROR`にし、error処理成功後は`unconfigured`へ戻ります。shutdown処理の失敗時も
+`finalized`にしたことにはせず、原因を解消してshutdownを再試行できます。デストラクタだけに安全停止を
+依存させず、`shutdownProcessor()`は複数回呼ばれても安全な処理として実装してください。
 
 ComponentStatus通知は安全停止を代行しません。`ERROR`や`CRITICAL`を通知する処理とは別に、必要な停止、
 リトライ、復旧処理を実装します。

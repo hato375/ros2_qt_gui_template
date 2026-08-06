@@ -47,6 +47,18 @@ protected:
 	/// @param errorMessage 失敗理由。falseを返す場合に設定する
 	/// @return 成功した場合true
 	virtual bool activateProcessor(QString& errorMessage);
+	/// @brief deactivate時の設備固有処理。派生クラスで処理の安全停止へ置き換える
+	/// @param errorMessage 失敗理由。falseを返す場合に設定する
+	/// @return 成功した場合true
+	virtual bool deactivateProcessor(QString& errorMessage);
+	/// @brief cleanup時の設備固有処理。派生クラスで接続や設定資源の解放へ置き換える
+	/// @param errorMessage 失敗理由。falseを返す場合に設定する
+	/// @return 成功した場合true
+	virtual bool cleanupProcessor(QString& errorMessage);
+	/// @brief shutdown時の設備固有処理。派生クラスで最終終了処理へ置き換える
+	/// @param errorMessage 失敗理由。falseを返す場合に設定する
+	/// @return 成功した場合true
+	virtual bool shutdownProcessor(QString& errorMessage);
 
 	CallbackReturn on_configure(const rclcpp_lifecycle::State& previousState) override;
 	CallbackReturn on_cleanup(const rclcpp_lifecycle::State& previousState) override;
