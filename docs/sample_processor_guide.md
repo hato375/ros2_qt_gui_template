@@ -118,6 +118,18 @@ Component IDが設定どおり`sample-processor-1`、Component stateが`WARNING`
 送信を`Ctrl+C`で止めると、3秒後に`TIMED OUT`へ変化します。同じ送信コマンドを再実行すると、
 `RECEIVING`へ復旧することも確認できます。
 
+### 4.4 デモ設定の自動起動テスト
+
+実際の`component_status_demo.launch.py`とインストール済みYAMLを使い、サンプルノードとGUIを同時起動する
+テストを実行できます。受信したComponent ID・状態と、GUI側の監視トピック・期待Component IDが一致する
+ことを確認します。
+
+```bash
+colcon test --packages-select sample_processor \
+  --ctest-args -R component_status_demo_launch_test
+colcon test-result --verbose
+```
+
 ## 5. パラメータ
 
 | パラメータ | 既定値 | 範囲 | 用途 |

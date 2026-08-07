@@ -97,6 +97,10 @@ colcon test --packages-select sample_processor \
 colcon test-result --verbose
 ```
 
+`lifecycle_component_status_demo_launch_test`は、実際のデモlaunchとインストール済みYAMLを使ってGUIも
+同時起動し、起動直後の`INITIALIZING`状態、Component ID、監視トピック、GUIの期待Component IDが一致する
+ことを確認します。
+
 ## 5. パラメータ
 
 | パラメータ | 既定値 | 範囲 | 用途 |

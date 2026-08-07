@@ -99,6 +99,14 @@ if(BUILD_TESTING)
 		test/sample_lifecycle_processor_launch_test.py
 		TIMEOUT 60
 	)
+	add_launch_test(
+		test/component_status_demo_launch_test.py
+		TIMEOUT 60
+	)
+	add_launch_test(
+		test/lifecycle_component_status_demo_launch_test.py
+		TIMEOUT 60
+	)
 endif()
 
 install(TARGETS
