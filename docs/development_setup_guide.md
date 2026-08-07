@@ -237,6 +237,10 @@ colcon test --packages-select \
 - 高頻度な受信状況のGUI通知が一定周期に集約される
 - 共通の`TopicReceptionMonitor`が最新値だけを保持し、状態遷移を通知する
 - 共通の`ComponentStatusNode`が状態変更時と設定周期で最新のコンポーネント状態を通知する
+
+GitHubへpushした変更は、`.github/workflows/linux-ros2-ci.yml`によりUbuntu 22.04・ROS 2 Humble環境でも
+ビルドと全テストを実行します。実行条件、ログの取得、ローカルでの再現方法は
+`docs/continuous_integration_guide.md`を参照してください。
 - 共通の`ComponentStatusPublisher`を通常のROSノードへ組み込める
 - Lifecycle Nodeの状態通知、Inactive中の受信継続、タイムアウト、および復旧をSupervisorまで検証する
 - Lifecycle Nodeを実プロセスで起動し、外部サービスによる遷移、状態通知、および正常終了を検証する
