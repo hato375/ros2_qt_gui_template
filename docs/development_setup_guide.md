@@ -234,6 +234,7 @@ colcon test --packages-select \
 - ROSタイマーのハートビートがqueued connection経由で到達する
 - コンポーネント状態トピックの初回受信、個別タイムアウト、および復旧が検出される
 - インストールされた`ros2_qt_gui.yaml`でGUIノードが起動し、主要な設定値が適用される
+- 空のComponent ID、範囲外の状態送信周期、重複トピックを含むYAMLでは起動を中止し、原因を報告する
 - 高頻度な受信状況のGUI通知が一定周期に集約される
 - 共通の`TopicReceptionMonitor`が最新値だけを保持し、状態遷移を通知する
 - 共通の`ComponentStatusNode`が状態変更時と設定周期で最新のコンポーネント状態を通知する

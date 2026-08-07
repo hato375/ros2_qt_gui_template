@@ -1,0 +1,17 @@
+invalid_empty_component_id:
+  ros__parameters:
+    component_status:
+      component_id: ""
+
+invalid_publish_interval:
+  ros__parameters:
+    component_status:
+      publish_interval_ms: 99
+
+invalid_duplicate_topic:
+  ros__parameters:
+    component_monitors:
+      camera:
+        status_topic: camera/status
+      plc:
+        status_topic: /camera/status

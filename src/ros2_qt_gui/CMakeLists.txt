@@ -76,6 +76,37 @@ if(BUILD_TESTING)
 		test/ros2_qt_gui_yaml_launch_test.py
 		TIMEOUT 60
 	)
+
+	add_executable(ros2_qt_gui_configuration_probe
+		test/ros2_qt_gui_configuration_probe.cpp
+		src/ros_node.cpp
+	)
+	target_include_directories(ros2_qt_gui_configuration_probe PRIVATE src)
+	target_link_libraries(
+		ros2_qt_gui_configuration_probe
+		Qt5::Widgets
+		yds_ros2::yds_ros2
+	)
+	ament_target_dependencies(
+		ros2_qt_gui_configuration_probe
+		rcl_interfaces
+		rclcpp
+		yds_interfaces
+	)
+	if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+		target_compile_options(
+			ros2_qt_gui_configuration_probe PRIVATE -Wall -Wextra -Wpedantic)
+	elseif(MSVC)
+		target_compile_options(ros2_qt_gui_configuration_probe PRIVATE /W4)
+	endif()
+	install(TARGETS ros2_qt_gui_configuration_probe
+		DESTINATION lib/${PROJECT_NAME}
+	)
+
+	add_launch_test(
+		test/ros2_qt_gui_invalid_yaml_launch_test.py
+		TIMEOUT 30
+	)
 endif()
 
 install(TARGETS ${PROJECT_NAME}
