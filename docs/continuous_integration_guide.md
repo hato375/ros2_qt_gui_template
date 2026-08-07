@@ -17,8 +17,9 @@ CI（Continuous Integration、継続的インテグレーション）は、変�
 - C++17
 - `QT_QPA_PLATFORM=offscreen`による画面なしGUIテスト
 
-ソース取得には`actions/checkout@v6`、ROS環境の準備には`ros-tooling/setup-ros@v0.7`を使用します。
-その後、ローカル手順と同じ`rosdep`、`colcon build`、`colcon test`、`colcon test-result`を個別のステップで
+ROS 2 Humbleが入った公式コンテナ`ros:humble-ros-base-jammy`上で実行します。コンテナは、
+実行ごとに同じ初期状態のROS 2環境を使うための隔離された実行環境です。ソース取得後、
+ローカル手順と同じ`rosdep`、`colcon build`、`colcon test`、`colcon test-result`を個別のステップで
 実行します。プロジェクト内の全ROSパッケージが対象です。
 
 ## 3. 実行条件

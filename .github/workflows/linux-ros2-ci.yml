@@ -18,6 +18,8 @@ jobs:
   build-and-test:
     name: Ubuntu 22.04 / ROS 2 Humble
     runs-on: ubuntu-22.04
+    container:
+      image: ros:humble-ros-base-jammy
     timeout-minutes: 45
     env:
       QT_QPA_PLATFORM: offscreen
@@ -25,15 +27,12 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v6
 
-      - name: Set up ROS 2
-        uses: ros-tooling/setup-ros@v0.7
-        with:
-          required-ros-distributions: humble
-
       - name: Install dependencies
         shell: bash
         run: |
           source /opt/ros/humble/setup.bash
+          apt-get update
+          rosdep update
           rosdep install --from-paths src --ignore-src --rosdistro humble -y
 
       - name: Build
