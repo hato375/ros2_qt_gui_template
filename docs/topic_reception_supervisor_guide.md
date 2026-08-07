@@ -84,6 +84,13 @@ ros2_qt_gui_node:
 起動エラーにします。例えばルート名前空間の`camera/status`と`/camera/status`は表記が異なっても同じ
 購読先へ解決されるため、重複として扱います。
 
+重複エラーには、衝突した値と双方のパラメータ名が表示されます。例えば`camera/status`と
+`/camera/status`が衝突した場合は、次のように修正対象を確認できます。
+
+```text
+component_monitors.plc.status_topic resolves to '/camera/status', already used by component_monitors.camera.status_topic
+```
+
 監視対象を増やす場合は、例えば`component_monitor_names`へ`rear_camera`を追加し、
 `component_monitors.rear_camera`以下へ設定を追加します。トピック名とタイムアウトが同じ設定ブロックに
 まとまるため、監視対象を並べ替えても対応関係は崩れません。

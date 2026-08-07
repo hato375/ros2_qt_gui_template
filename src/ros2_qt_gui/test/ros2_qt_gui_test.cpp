@@ -225,6 +225,25 @@ bool waitFor(const std::function<bool()>& condition, int timeoutMilliseconds) {
 	return condition();
 }
 
+void expectInvalidMonitorConfiguration(
+	const rclcpp::NodeOptions& options,
+	const std::string& expectedMessage) {
+	try {
+		auto node = std::make_shared<ros2qtgui::RosNode>(
+			[](std::uint64_t) {
+			},
+			ros2qtgui::RosNode::ApplicationEventCallback(),
+			ros2qtgui::RosNode::TopicReceptionStatusCallback(),
+			ros2qtgui::RosNode::ComponentStatusCallback(),
+			options);
+		FAIL() << "Expected std::invalid_argument";
+	} catch (const std::invalid_argument& exception) {
+		EXPECT_EQ(exception.what(), expectedMessage);
+	} catch (...) {
+		FAIL() << "Expected std::invalid_argument";
+	}
+}
+
 class LifecycleStatusIntegrationNode final : public rclcpp_lifecycle::LifecycleNode {
 public:
 	LifecycleStatusIntegrationNode()
@@ -785,15 +804,9 @@ TEST(RosNodeParameterTest, RejectsInvalidComponentMonitorParameters) {
 			"component_monitor_names",
 			std::vector<std::string>{"camera", "camera"}),
 	});
-	EXPECT_ANY_THROW({
-		auto node = std::make_shared<ros2qtgui::RosNode>(
-			[](std::uint64_t) {
-			},
-			ros2qtgui::RosNode::ApplicationEventCallback(),
-			ros2qtgui::RosNode::TopicReceptionStatusCallback(),
-			ros2qtgui::RosNode::ComponentStatusCallback(),
-			duplicateMonitorNameOptions);
-	});
+	expectInvalidMonitorConfiguration(
+		duplicateMonitorNameOptions,
+		"component_monitor_names contains duplicate name 'camera'");
 
 	rclcpp::NodeOptions emptyTopicOptions;
 	emptyTopicOptions.parameter_overrides({
@@ -827,29 +840,19 @@ TEST(RosNodeParameterTest, RejectsInvalidComponentMonitorParameters) {
 	duplicateTopicOptions.parameter_overrides({
 		rclcpp::Parameter("component_monitors.plc.status_topic", "camera/status"),
 	});
-	EXPECT_ANY_THROW({
-		auto node = std::make_shared<ros2qtgui::RosNode>(
-			[](std::uint64_t) {
-			},
-			ros2qtgui::RosNode::ApplicationEventCallback(),
-			ros2qtgui::RosNode::TopicReceptionStatusCallback(),
-			ros2qtgui::RosNode::ComponentStatusCallback(),
-			duplicateTopicOptions);
-	});
+	expectInvalidMonitorConfiguration(
+		duplicateTopicOptions,
+		"component_monitors.plc.status_topic resolves to '/camera/status', already used by "
+		"component_monitors.camera.status_topic");
 
 	rclcpp::NodeOptions equivalentTopicOptions;
 	equivalentTopicOptions.parameter_overrides({
 		rclcpp::Parameter("component_monitors.plc.status_topic", "/camera/status"),
 	});
-	EXPECT_ANY_THROW({
-		auto node = std::make_shared<ros2qtgui::RosNode>(
-			[](std::uint64_t) {
-			},
-			ros2qtgui::RosNode::ApplicationEventCallback(),
-			ros2qtgui::RosNode::TopicReceptionStatusCallback(),
-			ros2qtgui::RosNode::ComponentStatusCallback(),
-			equivalentTopicOptions);
-	});
+	expectInvalidMonitorConfiguration(
+		equivalentTopicOptions,
+		"component_monitors.plc.status_topic resolves to '/camera/status', already used by "
+		"component_monitors.camera.status_topic");
 
 	rclcpp::NodeOptions invalidExpectedComponentIdOptions;
 	invalidExpectedComponentIdOptions.parameter_overrides({
@@ -884,15 +887,10 @@ TEST(RosNodeParameterTest, RejectsInvalidComponentMonitorParameters) {
 		rclcpp::Parameter("component_monitors.camera.expected_component_id", "controller-1"),
 		rclcpp::Parameter("component_monitors.plc.expected_component_id", "controller-1"),
 	});
-	EXPECT_ANY_THROW({
-		auto node = std::make_shared<ros2qtgui::RosNode>(
-			[](std::uint64_t) {
-			},
-			ros2qtgui::RosNode::ApplicationEventCallback(),
-			ros2qtgui::RosNode::TopicReceptionStatusCallback(),
-			ros2qtgui::RosNode::ComponentStatusCallback(),
-			duplicateExpectedComponentIdOptions);
-	});
+	expectInvalidMonitorConfiguration(
+		duplicateExpectedComponentIdOptions,
+		"component_monitors.plc.expected_component_id duplicates value 'controller-1' "
+		"already used by component_monitors.camera.expected_component_id");
 
 	rclcpp::NodeOptions timeoutOptions;
 	timeoutOptions.parameter_overrides({

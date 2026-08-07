@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <exception>
+#include <map>
 #include <regex>
 #include <set>
 #include <stdexcept>
@@ -199,12 +200,13 @@ RosNode::RosNode(
 		throw std::invalid_argument("component_monitor_names must not be empty");
 	}
 	std::set<std::string> uniqueMonitorNames;
-	std::set<std::string> uniqueResolvedTopicNames;
-	std::set<std::string> uniqueExpectedComponentIds;
+	std::map<std::string, std::string> resolvedTopicOwners;
+	std::map<std::string, std::string> expectedComponentIdOwners;
 	for (const auto& monitorName : componentMonitorNames_) {
 		validateMonitorName(monitorName);
 		if (!uniqueMonitorNames.insert(monitorName).second) {
-			throw std::invalid_argument("component_monitor_names must not contain duplicates");
+			throw std::invalid_argument(
+				"component_monitor_names contains duplicate name '" + monitorName + "'");
 		}
 
 		const std::string parameterPrefix = "component_monitors." + monitorName;
@@ -261,13 +263,22 @@ RosNode::RosNode(
 		}
 		const std::string resolvedTopicName =
 			get_node_topics_interface()->resolve_topic_name(topicName);
-		if (!uniqueResolvedTopicNames.insert(resolvedTopicName).second) {
-			throw std::invalid_argument("component monitor status topics must not contain duplicates");
-		}
-		if (enabled && !expectedComponentId.empty() &&
-			!uniqueExpectedComponentIds.insert(expectedComponentId).second) {
+		const auto topicInsertion = resolvedTopicOwners.emplace(resolvedTopicName, monitorName);
+		if (!topicInsertion.second) {
 			throw std::invalid_argument(
-				"enabled component monitors must not have duplicate expected component IDs");
+				parameterPrefix + ".status_topic resolves to '" + resolvedTopicName +
+				"', already used by component_monitors." + topicInsertion.first->second +
+				".status_topic");
+		}
+		if (enabled && !expectedComponentId.empty()) {
+			const auto componentIdInsertion =
+				expectedComponentIdOwners.emplace(expectedComponentId, monitorName);
+			if (!componentIdInsertion.second) {
+				throw std::invalid_argument(
+					parameterPrefix + ".expected_component_id duplicates value '" +
+					expectedComponentId + "' already used by component_monitors." +
+					componentIdInsertion.first->second + ".expected_component_id");
+			}
 		}
 		validateInterval(
 			parameterPrefix + ".timeout_ms",
