@@ -17,8 +17,9 @@ CI（Continuous Integration、継続的インテグレーション）は、変�
 - C++17
 - `QT_QPA_PLATFORM=offscreen`による画面なしGUIテスト
 
-ROS環境の準備には`ros-tooling/setup-ros@v0.7`、依存解決・ビルド・テストには
-`ros-tooling/action-ros-ci@v0.4`を使用します。プロジェクト内の全ROSパッケージが対象です。
+ソース取得には`actions/checkout@v6`、ROS環境の準備には`ros-tooling/setup-ros@v0.7`を使用します。
+その後、ローカル手順と同じ`rosdep`、`colcon build`、`colcon test`、`colcon test-result`を個別のステップで
+実行します。プロジェクト内の全ROSパッケージが対象です。
 
 ## 3. 実行条件
 
@@ -34,7 +35,9 @@ ROS環境の準備には`ros-tooling/setup-ros@v0.7`、依存解決・ビルド�
 ## 4. 結果の確認
 
 GitHubリポジトリのActions画面で`Linux ROS 2 CI`を選択します。成功時はビルドと全テストが完了しています。
-失敗時は`Build and run tests`の出力を確認してください。
+失敗時は`Install dependencies`、`Build`、`Run tests`、`Report test results`のうち、失敗したステップの
+出力を確認してください。処理を分けているため、依存解決、コンパイル、テストのどこで失敗したかを
+Actions画面から判別できます。
 
 成功・失敗にかかわらず、colconがワークスペースを作成できた場合は`colcon-logs`をアーティファクトとして
 14日間保存します。アーティファクトはCI実行結果の画面からダウンロードでき、各パッケージの標準出力、

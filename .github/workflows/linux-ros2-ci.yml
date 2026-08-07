@@ -22,23 +22,45 @@ jobs:
     env:
       QT_QPA_PLATFORM: offscreen
     steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+
       - name: Set up ROS 2
         uses: ros-tooling/setup-ros@v0.7
         with:
           required-ros-distributions: humble
 
-      - name: Build and run tests
-        id: ros_ci
-        uses: ros-tooling/action-ros-ci@v0.4
-        with:
-          target-ros2-distro: humble
-          coverage-result: false
+      - name: Install dependencies
+        shell: bash
+        run: |
+          source /opt/ros/humble/setup.bash
+          rosdep install --from-paths src --ignore-src --rosdistro humble -y
+
+      - name: Build
+        shell: bash
+        run: |
+          source /opt/ros/humble/setup.bash
+          colcon build --event-handlers console_direct+
+
+      - name: Run tests
+        shell: bash
+        run: |
+          source /opt/ros/humble/setup.bash
+          source install/setup.bash
+          colcon test --event-handlers console_direct+
+
+      - name: Report test results
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          source /opt/ros/humble/setup.bash
+          colcon test-result --verbose
 
       - name: Upload colcon logs
-        if: ${{ always() && steps.ros_ci.outputs.ros-workspace-directory-name != '' }}
+        if: ${{ always() }}
         uses: actions/upload-artifact@v7
         with:
           name: colcon-logs
-          path: ${{ steps.ros_ci.outputs.ros-workspace-directory-name }}/log
+          path: log
           if-no-files-found: warn
           retention-days: 14
