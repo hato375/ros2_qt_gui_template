@@ -24,6 +24,8 @@ namespace ros2qtgui {
 namespace {
 
 constexpr std::int64_t kDefaultHeartbeatIntervalMs = 1000;
+constexpr char kDefaultSupervisorComponentId[] = "ros2-qt-gui-supervisor-1";
+constexpr char kDefaultSupervisorStatusTopicName[] = "ros2_qt_gui/status";
 constexpr std::int64_t kMinimumHeartbeatIntervalMs = 100;
 constexpr std::int64_t kMaximumHeartbeatIntervalMs = 60000;
 constexpr std::int64_t kDefaultGuiStatusCheckIntervalMs = 200;
@@ -139,7 +141,12 @@ RosNode::RosNode(
 	TopicReceptionStatusCallback topicReceptionStatusCallback,
 	ComponentStatusCallback componentStatusCallback,
 	const rclcpp::NodeOptions& options)
-	: Node("ros2_qt_gui_node", options),
+	: ComponentStatusNode(
+		  "ros2_qt_gui_node",
+		  QString::fromLatin1(kDefaultSupervisorComponentId),
+		  QString::fromLatin1(kDefaultSupervisorStatusTopicName),
+		  std::chrono::milliseconds(kDefaultHeartbeatIntervalMs),
+		  options),
 	  heartbeatCallback_(std::move(heartbeatCallback)),
 	  applicationEventCallback_(std::move(applicationEventCallback)),
 	  topicReceptionStatusCallback_(std::move(topicReceptionStatusCallback)),
@@ -392,6 +399,12 @@ RosNode::RosNode(
 			static_cast<long>(configuration.timeoutMs),
 			static_cast<long>(configuration.maximumStatusAgeMs),
 			static_cast<long>(configuration.maximumFutureSkewMs));
+	}
+	if (!setComponentStatus(
+			yds::ros2::ComponentState::kRunning,
+			0,
+			QStringLiteral("Monitoring component statuses"))) {
+		throw std::runtime_error("failed to publish supervisor component status");
 	}
 	RCLCPP_INFO(get_logger(), "ROS 2 node started");
 }

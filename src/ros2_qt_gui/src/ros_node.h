@@ -8,11 +8,11 @@
 
 #include <QString>
 
-#include <rclcpp/rclcpp.hpp>
 #include <yds_interfaces/msg/component_status.hpp>
 
 #include <yds/ros2/application_event.h>
 #include <yds/ros2/component_status.h>
+#include <yds/ros2/component_status_node.h>
 #include <yds/ros2/repeated_event_rate_limiter.h>
 #include <yds/ros2/topic_reception_monitor.h>
 #include <yds/ros2/topic_reception_status.h>
@@ -38,7 +38,7 @@ struct ComponentMonitorConfiguration {
 };
 
 /// @brief GUIと連携するROS 2ノード
-class RosNode final : public rclcpp::Node {
+class RosNode final : public yds::ros2::ComponentStatusNode {
 public:
 	using HeartbeatCallback = std::function<void(std::uint64_t)>;
 	using ApplicationEventCallback = std::function<void(const yds::ros2::ApplicationEvent&)>;

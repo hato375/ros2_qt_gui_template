@@ -690,6 +690,13 @@ TEST(RosNodeParameterTest, UsesDefaultValues) {
 	auto node = std::make_shared<ros2qtgui::RosNode>([](std::uint64_t) {
 	});
 
+	EXPECT_EQ(node->componentId(), QStringLiteral("ros2-qt-gui-supervisor-1"));
+	EXPECT_EQ(node->statusTopicName(), QStringLiteral("ros2_qt_gui/status"));
+	EXPECT_EQ(node->statusPublishInterval(), std::chrono::milliseconds(1000));
+	EXPECT_EQ(node->componentStatus().state, yds::ros2::ComponentState::kRunning);
+	EXPECT_EQ(
+		node->componentStatus().message,
+		QStringLiteral("Monitoring component statuses"));
 	EXPECT_EQ(node->heartbeatIntervalMs(), 1000);
 	EXPECT_EQ(node->guiStatusCheckIntervalMs(), 200);
 	EXPECT_EQ(node->repeatedErrorReportIntervalMs(), 10000);
@@ -714,6 +721,9 @@ TEST(RosNodeParameterTest, UsesDefaultValues) {
 TEST(RosNodeParameterTest, UsesOverrideValues) {
 	rclcpp::NodeOptions options;
 	options.parameter_overrides({
+		rclcpp::Parameter("component_status.component_id", "supervisor-test-1"),
+		rclcpp::Parameter("component_status.status_topic", "supervisor_test/status"),
+		rclcpp::Parameter("component_status.publish_interval_ms", 500),
 		rclcpp::Parameter("heartbeat_interval_ms", 250),
 		rclcpp::Parameter("gui_status_check_interval_ms", 100),
 		rclcpp::Parameter("repeated_error_report_interval_ms", 2500),
@@ -737,6 +747,9 @@ TEST(RosNodeParameterTest, UsesOverrideValues) {
 		ros2qtgui::RosNode::ComponentStatusCallback(),
 		options);
 
+	EXPECT_EQ(node->componentId(), QStringLiteral("supervisor-test-1"));
+	EXPECT_EQ(node->statusTopicName(), QStringLiteral("supervisor_test/status"));
+	EXPECT_EQ(node->statusPublishInterval(), std::chrono::milliseconds(500));
 	EXPECT_EQ(node->heartbeatIntervalMs(), 250);
 	EXPECT_EQ(node->guiStatusCheckIntervalMs(), 100);
 	EXPECT_EQ(node->repeatedErrorReportIntervalMs(), 2500);
@@ -749,6 +762,47 @@ TEST(RosNodeParameterTest, UsesOverrideValues) {
 	EXPECT_EQ(configurations[0].timeoutMs, 7000);
 	EXPECT_EQ(configurations[0].maximumStatusAgeMs, 5000);
 	EXPECT_EQ(configurations[0].maximumFutureSkewMs, 1000);
+}
+
+TEST(RosNodeComponentStatusIntegrationTest, PublishesSupervisorRunningStatus) {
+	std::atomic_bool receivedExpectedStatus(false);
+	std::atomic_bool receivedHeartbeat(false);
+	auto observerNode = std::make_shared<rclcpp::Node>("supervisor_status_observer");
+	auto subscription = observerNode->create_subscription<yds_interfaces::msg::ComponentStatus>(
+		"ros2_qt_gui/status",
+		rclcpp::QoS(rclcpp::KeepLast(1)).reliable().transient_local(),
+		[&receivedExpectedStatus](
+			const yds_interfaces::msg::ComponentStatus::SharedPtr message) {
+			receivedExpectedStatus.store(
+				message->component_id == "ros2-qt-gui-supervisor-1" &&
+				message->state ==
+					yds_interfaces::msg::ComponentStatus::STATE_RUNNING &&
+				message->error_code == 0 &&
+				message->message == "Monitoring component statuses");
+		});
+
+	rclcpp::NodeOptions supervisorOptions;
+	supervisorOptions.parameter_overrides({
+		rclcpp::Parameter("heartbeat_interval_ms", 100),
+	});
+	auto supervisorNode = std::make_shared<ros2qtgui::RosNode>(
+		[&receivedHeartbeat](std::uint64_t) {
+			receivedHeartbeat.store(true);
+		},
+		ros2qtgui::RosNode::ApplicationEventCallback(),
+		ros2qtgui::RosNode::TopicReceptionStatusCallback(),
+		ros2qtgui::RosNode::ComponentStatusCallback(),
+		supervisorOptions);
+	yds::ros2::ExecutorRunner observerExecutor(observerNode);
+	yds::ros2::ExecutorRunner supervisorExecutor(supervisorNode);
+
+	EXPECT_TRUE(waitFor([&receivedExpectedStatus, &receivedHeartbeat]() {
+		return receivedExpectedStatus.load() && receivedHeartbeat.load();
+	}, 1500));
+
+	supervisorExecutor.stop();
+	observerExecutor.stop();
+	(void)subscription;
 }
 
 TEST(RosNodeParameterTest, RejectsOutOfRangeValues) {

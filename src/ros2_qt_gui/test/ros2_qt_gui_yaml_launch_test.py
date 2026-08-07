@@ -62,6 +62,9 @@ class TestRos2QtGuiYamlConfiguration(unittest.TestCase):
     def test_installed_yaml_values_are_applied(self):
         self.assertTrue(self.parameter_client.wait_for_service(timeout_sec=10.0))
         parameter_names = [
+            "component_status.component_id",
+            "component_status.status_topic",
+            "component_status.publish_interval_ms",
             "heartbeat_interval_ms",
             "gui_status_check_interval_ms",
             "repeated_error_report_interval_ms",
@@ -82,6 +85,15 @@ class TestRos2QtGuiYamlConfiguration(unittest.TestCase):
             name: parameter_value_to_python(value)
             for name, value in zip(parameter_names, future.result().values)
         }
+        self.assertEqual(
+            values["component_status.component_id"],
+            "ros2-qt-gui-supervisor-1",
+        )
+        self.assertEqual(
+            values["component_status.status_topic"],
+            "ros2_qt_gui/status",
+        )
+        self.assertEqual(values["component_status.publish_interval_ms"], 1000)
         self.assertEqual(values["heartbeat_interval_ms"], 1000)
         self.assertEqual(values["gui_status_check_interval_ms"], 200)
         self.assertEqual(values["repeated_error_report_interval_ms"], 10000)

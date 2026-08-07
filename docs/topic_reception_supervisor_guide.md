@@ -41,6 +41,10 @@ ROS 2のプロセス内通信最適化は`Transient Local`と併用できませ�
 ```yaml
 ros2_qt_gui_node:
   ros__parameters:
+    component_status:
+      component_id: ros2-qt-gui-supervisor-1
+      status_topic: ros2_qt_gui/status
+      publish_interval_ms: 1000
     heartbeat_interval_ms: 1000
     gui_status_check_interval_ms: 200
     repeated_error_report_interval_ms: 10000
@@ -65,6 +69,18 @@ ros2_qt_gui_node:
         maximum_status_age_ms: 0
         maximum_future_skew_ms: 0
 ```
+
+Supervisor自身も`ComponentStatus`Publisherを持ち、起動完了後は`RUNNING`を定期通知します。
+これにより、別のSupervisorや上位システムから、監視する側自身の停止も検出できます。
+
+| Supervisor自身の項目 | 説明 |
+|---|---|
+| `component_status.component_id` | Supervisorを識別するID |
+| `component_status.status_topic` | Supervisor自身の`ComponentStatus`送信先 |
+| `component_status.publish_interval_ms` | 最新状態の定期送信周期。100～600000ミリ秒 |
+
+Supervisorの状態送信と監視対象の受信は別の責務です。`component_status.status_topic`はSupervisor自身の送信先、
+`component_monitors.*.status_topic`は設備ノードからの受信先です。
 
 `component_monitor_names`へ監視設定名を列挙し、`component_monitors`以下へ同じ名前の設定を記述します。
 設定名は英字またはアンダースコアで始め、英数字とアンダースコアを使用できます。設定名は設定内の
