@@ -91,9 +91,10 @@ int main(int argc, char* argv[]) {
 			QDateTime::currentDateTime(),
 			QStringLiteral(
 				"Configuration: heartbeat_interval_ms=%1, gui_status_check_interval_ms=%2, "
-				"component_monitors=[%3]")
+				"repeated_error_report_interval_ms=%3, component_monitors=[%4]")
 				.arg(rosNode->heartbeatIntervalMs())
 				.arg(rosNode->guiStatusCheckIntervalMs())
+				.arg(rosNode->repeatedErrorReportIntervalMs())
 				.arg(componentMonitorDescriptions.join(QStringLiteral(", ")))});
 
 		yds::ros2::ExecutorRunner executorRunner(rosNode);

@@ -174,6 +174,7 @@ src/ros2_qt_gui/config/ros2_qt_gui.yaml
 |---|---:|---:|---|
 | `heartbeat_interval_ms` | 1000 | 100～60000 | ROSハートビート周期 |
 | `gui_status_check_interval_ms` | 200 | 50～10000 | GUIによるROS状態確認周期 |
+| `repeated_error_report_interval_ms` | 10000 | 1000～600000 | 継続する同一処理経路の異常を再通知する最小間隔 |
 | `component_monitor_names` | `[camera, plc]` | 先頭は英字・`_`、英数字・`_`、重複不可 | 監視設定名の一覧 |
 | `component_monitors.<name>.enabled` | `true` | `true`または`false` | 監視の有効・無効 |
 | `component_monitors.<name>.display_name` | `<name>` | 空文字・空白だけは不可 | GUIに表示するコンポーネント名 |
@@ -232,6 +233,7 @@ colcon test --packages-select \
 - GUIのイベントログが最新500件に制限される
 - ROSタイマーのハートビートがqueued connection経由で到達する
 - コンポーネント状態トピックの初回受信、個別タイムアウト、および復旧が検出される
+- インストールされた`ros2_qt_gui.yaml`でGUIノードが起動し、主要な設定値が適用される
 - 高頻度な受信状況のGUI通知が一定周期に集約される
 - 共通の`TopicReceptionMonitor`が最新値だけを保持し、状態遷移を通知する
 - 共通の`ComponentStatusNode`が状態変更時と設定周期で最新のコンポーネント状態を通知する

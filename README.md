@@ -88,6 +88,7 @@ ros2_qt_gui_node:
   ros__parameters:
     heartbeat_interval_ms: 1000
     gui_status_check_interval_ms: 200
+    repeated_error_report_interval_ms: 10000
     component_monitor_names:
       - camera
       - plc

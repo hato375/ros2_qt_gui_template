@@ -68,6 +68,9 @@ public:
 	/// @brief GUI状態確認周期を取得する
 	/// @return GUI状態確認周期（ミリ秒）
 	std::int64_t guiStatusCheckIntervalMs() const noexcept;
+	/// @brief 繰り返し異常の最小通知間隔を取得する
+	/// @return 最小通知間隔（ミリ秒）
+	std::int64_t repeatedErrorReportIntervalMs() const noexcept;
 
 	/// @brief 有効なトピック監視設定の一覧を取得する
 	/// @return 有効なトピック監視設定の一覧
@@ -104,6 +107,7 @@ private:
 	ComponentStatusCallback componentStatusCallback_;
 	std::int64_t heartbeatIntervalMs_;
 	std::int64_t guiStatusCheckIntervalMs_;
+	std::int64_t repeatedErrorReportIntervalMs_;
 	std::vector<std::string> componentMonitorNames_;
 	std::vector<ComponentMonitorConfiguration> componentMonitorConfigurations_;
 	std::vector<std::unique_ptr<yds::ros2::TopicReceptionMonitor>>

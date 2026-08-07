@@ -692,6 +692,7 @@ TEST(RosNodeParameterTest, UsesDefaultValues) {
 
 	EXPECT_EQ(node->heartbeatIntervalMs(), 1000);
 	EXPECT_EQ(node->guiStatusCheckIntervalMs(), 200);
+	EXPECT_EQ(node->repeatedErrorReportIntervalMs(), 10000);
 	const auto& configurations = node->componentMonitorConfigurations();
 	ASSERT_EQ(configurations.size(), 2U);
 	EXPECT_EQ(configurations[0].name, QStringLiteral("camera"));
@@ -715,6 +716,7 @@ TEST(RosNodeParameterTest, UsesOverrideValues) {
 	options.parameter_overrides({
 		rclcpp::Parameter("heartbeat_interval_ms", 250),
 		rclcpp::Parameter("gui_status_check_interval_ms", 100),
+		rclcpp::Parameter("repeated_error_report_interval_ms", 2500),
 		rclcpp::Parameter(
 			"component_monitor_names",
 			std::vector<std::string>{"camera", "robot"}),
@@ -737,6 +739,7 @@ TEST(RosNodeParameterTest, UsesOverrideValues) {
 
 	EXPECT_EQ(node->heartbeatIntervalMs(), 250);
 	EXPECT_EQ(node->guiStatusCheckIntervalMs(), 100);
+	EXPECT_EQ(node->repeatedErrorReportIntervalMs(), 2500);
 	const auto& configurations = node->componentMonitorConfigurations();
 	ASSERT_EQ(configurations.size(), 1U);
 	EXPECT_EQ(configurations[0].name, QStringLiteral("robot"));
@@ -762,6 +765,20 @@ TEST(RosNodeParameterTest, RejectsOutOfRangeValues) {
 			ros2qtgui::RosNode::TopicReceptionStatusCallback(),
 			ros2qtgui::RosNode::ComponentStatusCallback(),
 			options);
+	});
+
+	rclcpp::NodeOptions repeatedErrorIntervalOptions;
+	repeatedErrorIntervalOptions.parameter_overrides({
+		rclcpp::Parameter("repeated_error_report_interval_ms", 999),
+	});
+	EXPECT_ANY_THROW({
+		auto node = std::make_shared<ros2qtgui::RosNode>(
+			[](std::uint64_t) {
+			},
+			ros2qtgui::RosNode::ApplicationEventCallback(),
+			ros2qtgui::RosNode::TopicReceptionStatusCallback(),
+			ros2qtgui::RosNode::ComponentStatusCallback(),
+			repeatedErrorIntervalOptions);
 	});
 }
 

@@ -40,6 +40,7 @@ endif()
 
 if(BUILD_TESTING)
 	find_package(ament_cmake_gtest REQUIRED)
+	find_package(launch_testing_ament_cmake REQUIRED)
 	find_package(rclcpp_lifecycle REQUIRED)
 
 	ament_add_gtest(ros2_qt_gui_test
@@ -70,6 +71,11 @@ if(BUILD_TESTING)
 	elseif(MSVC)
 		target_compile_options(ros2_qt_gui_test PRIVATE /W4)
 	endif()
+
+	add_launch_test(
+		test/ros2_qt_gui_yaml_launch_test.py
+		TIMEOUT 60
+	)
 endif()
 
 install(TARGETS ${PROJECT_NAME}

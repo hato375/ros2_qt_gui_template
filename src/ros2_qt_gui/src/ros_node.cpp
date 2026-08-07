@@ -36,7 +36,9 @@ constexpr std::int64_t kMinimumTopicReceptionTimeoutMs = 500;
 constexpr std::int64_t kMaximumTopicReceptionTimeoutMs = 600000;
 constexpr std::int64_t kMaximumTimestampToleranceMs = 86400000;
 constexpr std::int64_t kTopicReceptionStatusUpdateIntervalMs = 200;
-constexpr std::int64_t kRepeatedErrorReportIntervalMs = 10000;
+constexpr std::int64_t kDefaultRepeatedErrorReportIntervalMs = 10000;
+constexpr std::int64_t kMinimumRepeatedErrorReportIntervalMs = 1000;
+constexpr std::int64_t kMaximumRepeatedErrorReportIntervalMs = 600000;
 
 enum ComponentStatusQualityIssue : std::uint32_t {
 	kNoQualityIssue = 0,
@@ -156,6 +158,13 @@ RosNode::RosNode(
 			  "GUI status check interval in milliseconds.",
 			  kMinimumGuiStatusCheckIntervalMs,
 			  kMaximumGuiStatusCheckIntervalMs))),
+	  repeatedErrorReportIntervalMs_(declare_parameter<std::int64_t>(
+		  "repeated_error_report_interval_ms",
+		  kDefaultRepeatedErrorReportIntervalMs,
+		  makeReadOnlyIntegerDescriptor(
+			  "Minimum interval for repeated error reports in milliseconds.",
+			  kMinimumRepeatedErrorReportIntervalMs,
+			  kMaximumRepeatedErrorReportIntervalMs))),
 	  componentMonitorNames_(declare_parameter<std::vector<std::string>>(
 		  "component_monitor_names",
 		  std::vector<std::string>{
@@ -170,14 +179,14 @@ RosNode::RosNode(
 	  componentStatusDirty_(),
 	  componentStatusQualityIssues_(),
 	  heartbeatCallbackErrorRateLimiter_(
-		  std::chrono::milliseconds(kRepeatedErrorReportIntervalMs)),
+		  std::chrono::milliseconds(repeatedErrorReportIntervalMs_)),
 	  topicReceptionErrorRateLimiters_(),
 	  topicReceptionStatusCallbackErrorRateLimiter_(
-		  std::chrono::milliseconds(kRepeatedErrorReportIntervalMs)),
+		  std::chrono::milliseconds(repeatedErrorReportIntervalMs_)),
 	  componentStatusCallbackErrorRateLimiter_(
-		  std::chrono::milliseconds(kRepeatedErrorReportIntervalMs)),
+		  std::chrono::milliseconds(repeatedErrorReportIntervalMs_)),
 	  applicationEventCallbackErrorRateLimiter_(
-		  std::chrono::milliseconds(kRepeatedErrorReportIntervalMs)),
+		  std::chrono::milliseconds(repeatedErrorReportIntervalMs_)),
 	  heartbeatCount_(0),
 	  heartbeatTimer_(),
 	  monitoredTopicSubscriptions_(),
@@ -196,6 +205,11 @@ RosNode::RosNode(
 		guiStatusCheckIntervalMs_,
 		kMinimumGuiStatusCheckIntervalMs,
 		kMaximumGuiStatusCheckIntervalMs);
+	validateInterval(
+		"repeated_error_report_interval_ms",
+		repeatedErrorReportIntervalMs_,
+		kMinimumRepeatedErrorReportIntervalMs,
+		kMaximumRepeatedErrorReportIntervalMs);
 	if (componentMonitorNames_.empty()) {
 		throw std::invalid_argument("component_monitor_names must not be empty");
 	}
@@ -338,7 +352,7 @@ RosNode::RosNode(
 		componentStatusQualityIssues_.push_back(kNoQualityIssue);
 		topicReceptionErrorRateLimiters_.push_back(
 			std::make_unique<yds::ros2::RepeatedEventRateLimiter>(
-				std::chrono::milliseconds(kRepeatedErrorReportIntervalMs)));
+				std::chrono::milliseconds(repeatedErrorReportIntervalMs_)));
 		monitoredTopicSubscriptions_.push_back(
 			create_subscription<yds_interfaces::msg::ComponentStatus>(
 			configuration.statusTopicName.toStdString(),
@@ -355,9 +369,10 @@ RosNode::RosNode(
 	RCLCPP_INFO(
 		get_logger(),
 		"Configuration: heartbeat_interval_ms=%ld, gui_status_check_interval_ms=%ld, "
-		"enabled_component_monitor_count=%lu",
+		"repeated_error_report_interval_ms=%ld, enabled_component_monitor_count=%lu",
 		static_cast<long>(heartbeatIntervalMs_),
 		static_cast<long>(guiStatusCheckIntervalMs_),
+		static_cast<long>(repeatedErrorReportIntervalMs_),
 		static_cast<unsigned long>(componentMonitorConfigurations_.size()));
 	for (const auto& configuration : componentMonitorConfigurations_) {
 		const QByteArray monitorNameUtf8 = configuration.name.toUtf8();
@@ -387,6 +402,10 @@ std::int64_t RosNode::heartbeatIntervalMs() const noexcept {
 
 std::int64_t RosNode::guiStatusCheckIntervalMs() const noexcept {
 	return guiStatusCheckIntervalMs_;
+}
+
+std::int64_t RosNode::repeatedErrorReportIntervalMs() const noexcept {
+	return repeatedErrorReportIntervalMs_;
 }
 
 const std::vector<ComponentMonitorConfiguration>& RosNode::componentMonitorConfigurations()

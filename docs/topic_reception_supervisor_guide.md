@@ -43,6 +43,7 @@ ros2_qt_gui_node:
   ros__parameters:
     heartbeat_interval_ms: 1000
     gui_status_check_interval_ms: 200
+    repeated_error_report_interval_ms: 10000
     component_monitor_names:
       - camera
       - plc
@@ -68,6 +69,10 @@ ros2_qt_gui_node:
 `component_monitor_names`へ監視設定名を列挙し、`component_monitors`以下へ同じ名前の設定を記述します。
 設定名は英字またはアンダースコアで始め、英数字とアンダースコアを使用できます。設定名は設定内の
 識別子であり、ROSトピック名とは分離します。
+
+`repeated_error_report_interval_ms`は、継続する同じ処理経路の異常を再通知する最小間隔です。既定値は
+10000ミリ秒で、1000～600000ミリ秒を設定できます。最初の異常と復旧後の再異常は、この間隔に関係なく
+直ちに通知されます。
 
 | 項目 | 説明 |
 |---|---|

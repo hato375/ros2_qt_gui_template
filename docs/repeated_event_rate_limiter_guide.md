@@ -35,7 +35,7 @@ try {
 
 ## 3. Supervisorでの適用
 
-`ros2_qt_gui`のSupervisorは、次の継続的なコールバック失敗へ10秒の通知間隔を適用します。
+`ros2_qt_gui`のSupervisorは、次の継続的なコールバック失敗へ、既定で10秒の通知間隔を適用します。
 
 - ハートビート通知
 - ComponentStatus受信処理
@@ -43,7 +43,8 @@ try {
 - ComponentStatusのGUI通知
 - GUIイベント通知
 
-最初の失敗は直ちに出力します。同じ処理経路で失敗が継続した場合は抑制し、10秒後の通知へ
+通知間隔はYAMLの`repeated_error_report_interval_ms`で1000～600000ミリ秒の範囲から指定できます。
+最初の失敗は直ちに出力します。同じ処理経路で失敗が継続した場合は抑制し、次回の通知へ
 `repeated occurrences suppressed`として抑制件数を付加します。正常なコールバックが一度完了すると
 抑制状態を解除します。
 
