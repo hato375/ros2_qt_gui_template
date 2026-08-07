@@ -1,3 +1,4 @@
+#include <chrono>
 #include <memory>
 
 #include <gtest/gtest.h>
@@ -7,6 +8,7 @@
 #include <sample_processor/sample_lifecycle_processor_error_codes.h>
 #include <sample_processor/sample_lifecycle_processor_node.h>
 #include <yds/ros2/component_status_node.h>
+#include <yds/ros2/repeated_event_rate_limiter.h>
 
 namespace {
 
@@ -61,6 +63,15 @@ TEST(SampleProcessorPublicApiTest, DerivesFromInstalledLifecycleNode) {
 	EXPECT_EQ(
 		node->componentStatus().message,
 		QStringLiteral("External processor configuration failed"));
+}
+
+TEST(SampleProcessorPublicApiTest, UsesInstalledRepeatedEventRateLimiter) {
+	using namespace std::chrono_literals;
+	yds::ros2::RepeatedEventRateLimiter limiter(10s);
+	const auto start = yds::ros2::RepeatedEventRateLimiter::Clock::time_point(100s);
+
+	EXPECT_TRUE(limiter.record(start).shouldReport);
+	EXPECT_FALSE(limiter.record(start + 1s).shouldReport);
 }
 
 }  // namespace

@@ -1,7 +1,9 @@
+#include <atomic>
 #include <chrono>
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <stdexcept>
 #include <string>
 #include <thread>
 #include <vector>
@@ -973,6 +975,56 @@ TEST(ExecutorRunnerIntegrationTest, DeliversHeartbeatAndStopsSafely) {
 	EXPECT_EQ(receiver.receiverThread(), QThread::currentThread());
 
 	executorRunner.stop();
+	executorRunner.stop();
+}
+
+TEST(HeartbeatErrorRateLimitIntegrationTest, SuppressesRepeatsAndReportsAfterRecovery) {
+	std::atomic<bool> failHeartbeat{true};
+	ros2qtgui::RosQtBridge bridge;
+	ApplicationEventReceiver eventReceiver;
+	QObject::connect(
+		&bridge,
+		&ros2qtgui::RosQtBridge::applicationEventOccurred,
+		&eventReceiver,
+		&ApplicationEventReceiver::receiveApplicationEvent,
+		Qt::QueuedConnection);
+
+	rclcpp::NodeOptions options;
+	options.parameter_overrides({
+		rclcpp::Parameter("heartbeat_interval_ms", 100),
+	});
+	auto node = std::make_shared<ros2qtgui::RosNode>(
+		[&failHeartbeat](std::uint64_t) {
+			if (failHeartbeat.load()) {
+				throw std::runtime_error("test heartbeat error");
+			}
+		},
+		[&bridge](const yds::ros2::ApplicationEvent& event) {
+			bridge.notifyApplicationEvent(event);
+		},
+		ros2qtgui::RosNode::TopicReceptionStatusCallback(),
+		ros2qtgui::RosNode::ComponentStatusCallback(),
+		options);
+	yds::ros2::ExecutorRunner executorRunner(node);
+
+	ASSERT_TRUE(waitFor([&eventReceiver]() {
+		return eventReceiver.eventCountContaining(
+			QStringLiteral("Heartbeat callback failed")) == 1;
+	}, 1000));
+	QThread::msleep(350);
+	QCoreApplication::processEvents();
+	EXPECT_EQ(
+		eventReceiver.eventCountContaining(QStringLiteral("Heartbeat callback failed")),
+		1);
+
+	failHeartbeat.store(false);
+	QThread::msleep(200);
+	failHeartbeat.store(true);
+	EXPECT_TRUE(waitFor([&eventReceiver]() {
+		return eventReceiver.eventCountContaining(
+			QStringLiteral("Heartbeat callback failed")) == 2;
+	}, 1000));
+
 	executorRunner.stop();
 }
 

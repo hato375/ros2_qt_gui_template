@@ -34,6 +34,7 @@ source install/setup.bash
 監視ダイアログの組み込み方法は`docs/component_monitor_dialog_guide.md`を参照してください。
 Lifecycle Nodeへの組み込み例は`docs/sample_lifecycle_processor_guide.md`を参照してください。
 優先度を含む未完了作業は`docs/development_backlog.md`を参照してください。
+繰り返し異常の通知抑制は`docs/repeated_event_rate_limiter_guide.md`を参照してください。
 
 ## 起動
 

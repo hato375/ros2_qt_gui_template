@@ -13,6 +13,7 @@
 
 #include <yds/ros2/application_event.h>
 #include <yds/ros2/component_status.h>
+#include <yds/ros2/repeated_event_rate_limiter.h>
 #include <yds/ros2/topic_reception_monitor.h>
 #include <yds/ros2/topic_reception_status.h>
 
@@ -92,6 +93,10 @@ private:
 	void reportApplicationEvent(
 		yds::ros2::ApplicationEventLevel level,
 		const QString& message) noexcept;
+	void reportRateLimitedError(
+		yds::ros2::RepeatedEventRateLimiter& rateLimiter,
+		const QString& message,
+		bool notifyApplicationEvent) noexcept;
 
 	HeartbeatCallback heartbeatCallback_;
 	ApplicationEventCallback applicationEventCallback_;
@@ -107,6 +112,12 @@ private:
 	std::vector<bool> hasComponentStatuses_;
 	std::vector<bool> componentStatusDirty_;
 	std::vector<std::uint32_t> componentStatusQualityIssues_;
+	yds::ros2::RepeatedEventRateLimiter heartbeatCallbackErrorRateLimiter_;
+	std::vector<std::unique_ptr<yds::ros2::RepeatedEventRateLimiter>>
+		topicReceptionErrorRateLimiters_;
+	yds::ros2::RepeatedEventRateLimiter topicReceptionStatusCallbackErrorRateLimiter_;
+	yds::ros2::RepeatedEventRateLimiter componentStatusCallbackErrorRateLimiter_;
+	yds::ros2::RepeatedEventRateLimiter applicationEventCallbackErrorRateLimiter_;
 	std::uint64_t heartbeatCount_;
 	rclcpp::TimerBase::SharedPtr heartbeatTimer_;
 	std::vector<rclcpp::Subscription<yds_interfaces::msg::ComponentStatus>::SharedPtr>

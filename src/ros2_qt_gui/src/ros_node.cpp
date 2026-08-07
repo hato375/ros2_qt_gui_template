@@ -35,6 +35,7 @@ constexpr std::int64_t kMinimumTopicReceptionTimeoutMs = 500;
 constexpr std::int64_t kMaximumTopicReceptionTimeoutMs = 600000;
 constexpr std::int64_t kMaximumTimestampToleranceMs = 86400000;
 constexpr std::int64_t kTopicReceptionStatusUpdateIntervalMs = 200;
+constexpr std::int64_t kRepeatedErrorReportIntervalMs = 10000;
 
 enum ComponentStatusQualityIssue : std::uint32_t {
 	kNoQualityIssue = 0,
@@ -167,6 +168,15 @@ RosNode::RosNode(
 	  hasComponentStatuses_(),
 	  componentStatusDirty_(),
 	  componentStatusQualityIssues_(),
+	  heartbeatCallbackErrorRateLimiter_(
+		  std::chrono::milliseconds(kRepeatedErrorReportIntervalMs)),
+	  topicReceptionErrorRateLimiters_(),
+	  topicReceptionStatusCallbackErrorRateLimiter_(
+		  std::chrono::milliseconds(kRepeatedErrorReportIntervalMs)),
+	  componentStatusCallbackErrorRateLimiter_(
+		  std::chrono::milliseconds(kRepeatedErrorReportIntervalMs)),
+	  applicationEventCallbackErrorRateLimiter_(
+		  std::chrono::milliseconds(kRepeatedErrorReportIntervalMs)),
 	  heartbeatCount_(0),
 	  heartbeatTimer_(),
 	  monitoredTopicSubscriptions_(),
@@ -297,6 +307,7 @@ RosNode::RosNode(
 	hasComponentStatuses_.reserve(componentMonitorConfigurations_.size());
 	componentStatusDirty_.reserve(componentMonitorConfigurations_.size());
 	componentStatusQualityIssues_.reserve(componentMonitorConfigurations_.size());
+	topicReceptionErrorRateLimiters_.reserve(componentMonitorConfigurations_.size());
 	monitoredTopicSubscriptions_.reserve(componentMonitorConfigurations_.size());
 	for (std::size_t index = 0; index < componentMonitorConfigurations_.size(); ++index) {
 		const auto& configuration = componentMonitorConfigurations_[index];
@@ -314,6 +325,9 @@ RosNode::RosNode(
 		hasComponentStatuses_.push_back(false);
 		componentStatusDirty_.push_back(false);
 		componentStatusQualityIssues_.push_back(kNoQualityIssue);
+		topicReceptionErrorRateLimiters_.push_back(
+			std::make_unique<yds::ros2::RepeatedEventRateLimiter>(
+				std::chrono::milliseconds(kRepeatedErrorReportIntervalMs)));
 		monitoredTopicSubscriptions_.push_back(
 			create_subscription<yds_interfaces::msg::ComponentStatus>(
 			configuration.statusTopicName.toStdString(),
@@ -375,16 +389,17 @@ void RosNode::onHeartbeat() noexcept {
 
 	try {
 		heartbeatCallback_(heartbeatCount_);
+		heartbeatCallbackErrorRateLimiter_.reset();
 	} catch (const std::exception& exception) {
-		RCLCPP_ERROR(get_logger(), "Heartbeat callback failed: %s", exception.what());
-		reportApplicationEvent(
-			yds::ros2::ApplicationEventLevel::kError,
-			QStringLiteral("Heartbeat callback failed: %1").arg(exception.what()));
+		reportRateLimitedError(
+			heartbeatCallbackErrorRateLimiter_,
+			QStringLiteral("Heartbeat callback failed: %1").arg(exception.what()),
+			true);
 	} catch (...) {
-		RCLCPP_ERROR(get_logger(), "Heartbeat callback failed with an unknown error");
-		reportApplicationEvent(
-			yds::ros2::ApplicationEventLevel::kError,
-			QStringLiteral("Heartbeat callback failed with an unknown error"));
+		reportRateLimitedError(
+			heartbeatCallbackErrorRateLimiter_,
+			QStringLiteral("Heartbeat callback failed with an unknown error"),
+			true);
 	}
 }
 
@@ -475,20 +490,17 @@ void RosNode::onMonitoredTopic(
 			monitor.status().topicName,
 			monitor.recordReception(status.message));
 		handleComponentStateTransition(previousStatus, status, hasPreviousStatus);
+		topicReceptionErrorRateLimiters_.at(monitorIndex)->reset();
 	} catch (const std::exception& exception) {
-		RCLCPP_ERROR(
-			get_logger(),
-			"Failed to record topic reception: %s",
-			exception.what());
-		reportApplicationEvent(
-			yds::ros2::ApplicationEventLevel::kError,
-			QStringLiteral("Failed to record topic reception: %1")
-				.arg(exception.what()));
+		reportRateLimitedError(
+			*topicReceptionErrorRateLimiters_.at(monitorIndex),
+			QStringLiteral("Failed to record topic reception: %1").arg(exception.what()),
+			true);
 	} catch (...) {
-		RCLCPP_ERROR(get_logger(), "Failed to record topic reception with an unknown error");
-		reportApplicationEvent(
-			yds::ros2::ApplicationEventLevel::kError,
-			QStringLiteral("Failed to record topic reception with an unknown error"));
+		reportRateLimitedError(
+			*topicReceptionErrorRateLimiters_.at(monitorIndex),
+			QStringLiteral("Failed to record topic reception with an unknown error"),
+			true);
 	}
 }
 
@@ -515,15 +527,17 @@ void RosNode::notifyTopicReceptionStatus(
 			return;
 		}
 		topicReceptionStatusCallback_(*status);
+		topicReceptionStatusCallbackErrorRateLimiter_.reset();
 	} catch (const std::exception& exception) {
-		RCLCPP_ERROR(
-			get_logger(),
-			"Topic reception status callback failed: %s",
-			exception.what());
+		reportRateLimitedError(
+			topicReceptionStatusCallbackErrorRateLimiter_,
+			QStringLiteral("Topic reception status callback failed: %1").arg(exception.what()),
+			false);
 	} catch (...) {
-		RCLCPP_ERROR(
-			get_logger(),
-			"Topic reception status callback failed with an unknown error");
+		reportRateLimitedError(
+			topicReceptionStatusCallbackErrorRateLimiter_,
+			QStringLiteral("Topic reception status callback failed with an unknown error"),
+			false);
 	}
 }
 
@@ -591,15 +605,17 @@ void RosNode::notifyComponentStatus(std::size_t monitorIndex) noexcept {
 	try {
 		componentStatusCallback_(latestComponentStatuses_.at(monitorIndex));
 		componentStatusDirty_.at(monitorIndex) = false;
+		componentStatusCallbackErrorRateLimiter_.reset();
 	} catch (const std::exception& exception) {
-		RCLCPP_ERROR(
-			get_logger(),
-			"Component status callback failed: %s",
-			exception.what());
+		reportRateLimitedError(
+			componentStatusCallbackErrorRateLimiter_,
+			QStringLiteral("Component status callback failed: %1").arg(exception.what()),
+			false);
 	} catch (...) {
-		RCLCPP_ERROR(
-			get_logger(),
-			"Component status callback failed with an unknown error");
+		reportRateLimitedError(
+			componentStatusCallbackErrorRateLimiter_,
+			QStringLiteral("Component status callback failed with an unknown error"),
+			false);
 	}
 }
 
@@ -652,13 +668,40 @@ void RosNode::reportApplicationEvent(
 
 	try {
 		applicationEventCallback_({level, QDateTime::currentDateTime(), message});
+		applicationEventCallbackErrorRateLimiter_.reset();
 	} catch (const std::exception& exception) {
-		RCLCPP_ERROR(
-			get_logger(),
-			"Application event callback failed: %s",
-			exception.what());
+		reportRateLimitedError(
+			applicationEventCallbackErrorRateLimiter_,
+			QStringLiteral("Application event callback failed: %1").arg(exception.what()),
+			false);
 	} catch (...) {
-		RCLCPP_ERROR(get_logger(), "Application event callback failed with an unknown error");
+		reportRateLimitedError(
+			applicationEventCallbackErrorRateLimiter_,
+			QStringLiteral("Application event callback failed with an unknown error"),
+			false);
+	}
+}
+
+void RosNode::reportRateLimitedError(
+	yds::ros2::RepeatedEventRateLimiter& rateLimiter,
+	const QString& message,
+	bool notifyApplicationEvent) noexcept {
+	const auto result = rateLimiter.record();
+	if (!result.shouldReport) {
+		return;
+	}
+
+	QString reportedMessage = message;
+	if (result.suppressedCount > 0) {
+		reportedMessage += QStringLiteral(" (%1 repeated occurrences suppressed)")
+			.arg(result.suppressedCount);
+	}
+	const QByteArray messageUtf8 = reportedMessage.toUtf8();
+	RCLCPP_ERROR(get_logger(), "%s", messageUtf8.constData());
+	if (notifyApplicationEvent) {
+		reportApplicationEvent(
+			yds::ros2::ApplicationEventLevel::kError,
+			reportedMessage);
 	}
 }
 

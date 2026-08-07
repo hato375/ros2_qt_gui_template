@@ -19,6 +19,7 @@ add_library(${PROJECT_NAME}
 	src/component_status_publisher.cpp
 	src/component_status_validation.cpp
 	src/executor_runner.cpp
+	src/repeated_event_rate_limiter.cpp
 	src/topic_reception_monitor.cpp
 )
 
@@ -44,6 +45,7 @@ if(BUILD_TESTING)
 		test/component_status_node_test.cpp
 		test/component_status_test.cpp
 		test/executor_runner_test.cpp
+		test/repeated_event_rate_limiter_test.cpp
 		test/topic_reception_monitor_test.cpp
 	)
 	target_link_libraries(yds_ros2_test ${PROJECT_NAME})
