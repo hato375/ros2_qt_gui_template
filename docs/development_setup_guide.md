@@ -88,6 +88,99 @@ cd ros2_test
 
 Git設定には`--local`を使用するため、開発者のグローバルGit設定は変更しません。
 
+### 4.1 テンプレートを新規GitHubプロジェクトとして展開する
+
+テンプレートを別プロジェクトへコピーするときは、テンプレート自身のGit履歴とcolcon生成物を
+コピーしないでください。`build`以下の`CMakeCache.txt`には元ワークスペースの絶対パスが保存されるため、
+別名のディレクトリへコピーするとCMakeのソースパス不一致でビルドに失敗します。
+
+`rsync`を使用する場合は、次のように除外します。
+
+```bash
+cd /home/ros
+rsync -a \
+  --exclude .git \
+  --exclude .project_setup \
+  --exclude build \
+  --exclude install \
+  --exclude log \
+  ros2_qt_gui_template/ <project_name>/
+cd <project_name>
+./setup_dev.sh
+```
+
+すでに`cp -a`でコピーした場合は、必ずコピー先であることを`pwd`で確認してから、コピーされたGit履歴と
+colcon生成物を削除して初期化します。元のテンプレート側では実行しないでください。
+
+```bash
+cd /home/ros/<project_name>
+pwd
+rm -rf .git .project_setup build install log
+./setup_dev.sh
+```
+
+`setup_dev.sh`は、Gitリポジトリがない場合に`main`ブランチで初期化し、入力されたGitユーザー情報を
+現在のプロジェクトだけに設定します。セットアップとビルドが成功したら、初回コミットを作成します。
+
+```bash
+git add .
+git commit -m "プロジェクトの初期構成を追加"
+```
+
+GitHub側にはREADME、`.gitignore`、ライセンスを自動追加しない空のリポジトリを作成します。
+SSH鍵をまだ作成していない場合は、次の手順で作成します。
+
+```bash
+ssh-keygen -t ed25519 -C "<Git email address>"
+eval "$(ssh-agent -s)"
+ssh-add ~/.ssh/id_ed25519
+cat ~/.ssh/id_ed25519.pub
+```
+
+表示された公開鍵をGitHubの`Settings`、`SSH and GPG keys`、`New SSH key`から登録します。
+秘密鍵`~/.ssh/id_ed25519`は表示、共有、コミットしないでください。登録後に接続を確認します。
+
+```bash
+ssh -T git@github.com
+```
+
+初回接続時にホスト鍵の確認が表示された場合は、接続先が`github.com`であることを確認して承認します。
+認証成功後、SSH形式のremoteを登録してpushします。
+
+```bash
+git remote add origin git@github.com:<owner>/<repository>.git
+git push -u origin main
+```
+
+以後は`git push`だけで`origin/main`へ送信できます。状態は次のコマンドで確認します。
+
+```bash
+git remote -v
+git status --short --branch
+git branch -vv
+```
+
+#### Git初回pushのトラブルシューティング
+
+`src refspec main does not match any`または`failed to push some refs`が表示される場合は、初回コミットが
+存在するか確認します。`No commits yet on main`の場合は、`git add`と`git commit`を先に実行してください。
+
+HTTPS remoteで`Password authentication is not supported`が表示される場合、GitHubアカウントの通常の
+パスワードは使用できません。Personal Access Tokenを使用するか、上記のSSH形式へ切り替えます。
+
+```bash
+git remote set-url origin git@github.com:<owner>/<repository>.git
+```
+
+`remote origin already exists`が表示される場合は`git remote add`を繰り返さず、現在値を確認して
+`set-url`で修正します。誤った名前のremoteを追加した場合は、その名前を確認して削除します。
+
+```bash
+git remote -v
+git remote set-url origin git@github.com:<owner>/<repository>.git
+git remote remove <unnecessary_remote_name>
+```
+
 #### プロジェクト名の規則
 
 プロジェクト名には、小文字英字で始まる小文字英数字とアンダースコアだけを使用します。
