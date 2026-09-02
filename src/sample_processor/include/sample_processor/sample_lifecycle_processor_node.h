@@ -2,19 +2,17 @@
 
 #include <atomic>
 #include <cstdint>
-#include <memory>
 
 #include <QString>
 
 #include <rclcpp/rclcpp.hpp>
-#include <rclcpp_lifecycle/lifecycle_node.hpp>
 
-#include <yds/ros2/component_status_publisher.h>
+#include <yds/ros2/lifecycle_component_status_node.h>
 
 namespace sampleprocessor {
 
 /// @brief コンポーネント状態通知を実装したLifecycleサンプルノード
-class SampleLifecycleProcessorNode : public rclcpp_lifecycle::LifecycleNode {
+class SampleLifecycleProcessorNode : public yds::ros2::LifecycleComponentStatusNode {
 public:
 	/// @brief Lifecycleサンプル処理ノードを生成する
 	/// @param options ROSノードオプション
@@ -34,9 +32,6 @@ public:
 
 	/// @brief 完了したサンプル処理回数を取得する
 	std::uint64_t processedCount() const noexcept;
-
-	/// @brief 現在のコンポーネント状態を取得する
-	yds::ros2::ComponentStatus componentStatus() const;
 
 protected:
 	/// @brief configure時の設備固有処理。派生クラスで接続や設定処理へ置き換える
@@ -86,7 +81,6 @@ private:
 	std::atomic<std::uint64_t> processedCount_;
 	qint32 transitionErrorCode_;
 	QString transitionErrorMessage_;
-	std::unique_ptr<yds::ros2::ComponentStatusPublisher> statusPublisher_;
 	rclcpp::TimerBase::SharedPtr processingTimer_;
 };
 

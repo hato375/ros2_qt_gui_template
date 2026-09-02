@@ -4,9 +4,10 @@
 
 `yds::ros2::ComponentStatusPublisher`は、camera、PLCなどの物理設備や、画像処理、点群生成などの
 ロジック機能を実装するノードから`yds_interfaces/msg/ComponentStatus`を共通の方法で通知します。
-通常の`rclcpp::Node`では、便利な基底クラス`yds::ros2::ComponentStatusNode`を利用できます。
+通常の`rclcpp::Node`では`yds::ros2::ComponentStatusNode`、Lifecycle Nodeでは
+`yds::ros2::LifecycleComponentStatusNode`を便利な基底クラスとして利用できます。
 
-このクラスは次の処理を提供します。
+これらのクラスは次の処理を提供します。
 
 - 状態変更時の即時Publish
 - 最新状態の定期Publish
@@ -17,9 +18,10 @@
 
 コンポーネント固有の初期化、復旧処理、安全停止判断は利用するノードの責務です。
 
-状態通知の実装本体は`ComponentStatusPublisher`へ分離されています。Node Interfaceを介してPublisherと
-Timerを登録するため、`rclcpp::Node`を継承済みのクラスやLifecycle Nodeを採用するクラスでも
-同じ状態管理処理を再利用できます。Lifecycle状態とコンポーネント状態は統合せず、別の軸として扱います。
+状態通知の実装本体は`ComponentStatusPublisher`へ分離されています。両基底クラスはノード種別に固有の
+構築を吸収し、同じ状態通知APIを提供します。別の基底クラスを継承済みのクラスでも、Publisherをメンバー
+として所有すれば同じ状態管理処理を再利用できます。Lifecycle状態とコンポーネント状態は統合せず、
+別の軸として扱います。
 
 ## 2. 派生ノードの実装例
 
@@ -154,45 +156,40 @@ if (validation.hasConsistencyWarning()) {
 
 ## 6. Lifecycle Nodeへ組み込む
 
-Lifecycle Nodeでは、`ComponentStatusNode`を継承せず、ROS 2標準の
-`rclcpp_lifecycle::LifecycleNode`を継承します。`ComponentStatusPublisher`はメンバーとして所有します。
+Lifecycle Nodeでは`LifecycleComponentStatusNode`を継承します。この共通基底クラスが
+`rclcpp_lifecycle::LifecycleNode`の継承、ROSパラメータの宣言・検証、および
+`ComponentStatusPublisher`の所有を吸収します。公開する状態通知APIは通常ノード用の
+`ComponentStatusNode`と同じです。
 
 ```cpp
 #include <chrono>
-#include <memory>
 
-#include <rclcpp_lifecycle/lifecycle_node.hpp>
-#include <yds/ros2/component_status_parameters.h>
-#include <yds/ros2/component_status_publisher.h>
+#include <yds/ros2/lifecycle_component_status_node.h>
 
-class LifecycleCameraNode final : public rclcpp_lifecycle::LifecycleNode {
+class LifecycleCameraNode final : public yds::ros2::LifecycleComponentStatusNode {
 public:
 	LifecycleCameraNode()
-		: rclcpp_lifecycle::LifecycleNode("camera_node"),
-		  statusPublisher_(std::make_unique<yds::ros2::ComponentStatusPublisher>(
-			  *this,
-			  yds::ros2::declareComponentStatusPublisherParameters(
-				  *this,
-				  yds::ros2::ComponentStatusPublisherConfiguration{
-					  QStringLiteral("camera-1"),
-					  QStringLiteral("camera/status"),
-					  std::chrono::milliseconds(1000)}))) {}
-
-private:
-	std::unique_ptr<yds::ros2::ComponentStatusPublisher> statusPublisher_;
+		: LifecycleComponentStatusNode(
+			"camera_node",
+			QStringLiteral("camera-1"),
+			QStringLiteral("camera/status"),
+			std::chrono::milliseconds(1000)) {}
 };
 ```
 
-`ComponentStatusPublisher`は通常のPublisherとTimerを使用し、Lifecycle Nodeが`INACTIVE`の間も
+`LifecycleComponentStatusNode`は内部で通常のPublisherとTimerを使用し、Lifecycle Nodeが`INACTIVE`の間も
 最新状態を定期通知します。これにより、Supervisorは正常にInactiveであるノードと、ノード停止や
 通信断を区別できます。Inactive時のコンポーネント状態は、設備の実態に応じて`READY`や`STOPPED`などを
 Lifecycleコールバックから明示的に設定してください。
 
 Lifecycle状態からComponentStatusへの自動変換は行いません。Lifecycle状態はノードの管理段階、
 ComponentStatusは設備またはロジック機能の業務状態であり、必ずしも一対一に対応しないためです。
-Lifecycle Nodeを実装するパッケージは、`yds_ros2`に加えて`rclcpp_lifecycle`へ依存してください。
+`LifecycleComponentStatusNode`の利用側は`yds_ros2`へ依存します。公開ヘッダーでLifecycle APIを直接使用する
+場合や、Lifecycle実行ファイルを構成する場合は`rclcpp_lifecycle`にも依存してください。
 
-`declareComponentStatusPublisherParameters()`は通常ノードとLifecycle Nodeのどちらでも利用でき、
+別の基底クラスを継承済みで`LifecycleComponentStatusNode`を利用できない場合は、従来どおり
+`ComponentStatusPublisher`をメンバーとして所有できます。`declareComponentStatusPublisherParameters()`は
+通常ノードとLifecycle Nodeのどちらでも利用でき、
 3章のROSパラメータを読み取り専用として宣言します。戻り値はパラメータoverrideを反映済みの
 `ComponentStatusPublisherConfiguration`です。これにより、ノード種別が異なっても同じYAML設定と
 入力値検証を使用できます。設定値をコード内で固定する場合は、この関数を使わず、従来どおり

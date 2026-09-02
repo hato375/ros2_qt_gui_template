@@ -12,7 +12,9 @@ find_package(ament_cmake REQUIRED)
 if(BUILD_TESTING)
 	find_package(ament_cmake_gtest REQUIRED)
 	find_package(rclcpp REQUIRED)
+	find_package(rclcpp_lifecycle REQUIRED)
 	find_package(sample_processor REQUIRED)
+	find_package(yds_ros2 REQUIRED)
 
 	ament_add_gtest(sample_processor_public_api_test
 		SKIP_LINKING_MAIN_LIBRARIES
@@ -22,8 +24,13 @@ if(BUILD_TESTING)
 		sample_processor_public_api_test
 		sample_processor::sample_processor_node
 		sample_processor::sample_lifecycle_processor_node
+		yds_ros2::yds_ros2
 	)
-	ament_target_dependencies(sample_processor_public_api_test rclcpp)
+	ament_target_dependencies(
+		sample_processor_public_api_test
+		rclcpp
+		rclcpp_lifecycle
+	)
 
 	if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
 		target_compile_options(sample_processor_public_api_test PRIVATE -Wall -Wextra -Wpedantic)

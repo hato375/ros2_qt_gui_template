@@ -11,12 +11,11 @@
 	<buildtool_depend>ament_cmake</buildtool_depend>
 
 	<depend>rclcpp</depend>
+	<depend>rclcpp_lifecycle</depend>
 	<depend>qtbase5-dev</depend>
 	<depend>yds_interfaces</depend>
 
 	<test_depend>ament_cmake_gtest</test_depend>
-	<test_depend>rclcpp_lifecycle</test_depend>
-
 	<export>
 		<build_type>ament_cmake</build_type>
 	</export>

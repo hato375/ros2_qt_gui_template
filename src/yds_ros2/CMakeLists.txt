@@ -9,6 +9,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(rclcpp_lifecycle REQUIRED)
 find_package(Qt5 REQUIRED COMPONENTS Core)
 find_package(yds_interfaces REQUIRED)
 
@@ -19,6 +20,7 @@ add_library(${PROJECT_NAME}
 	src/component_status_publisher.cpp
 	src/component_status_validation.cpp
 	src/executor_runner.cpp
+	src/lifecycle_component_status_node.cpp
 	src/repeated_event_rate_limiter.cpp
 	src/topic_reception_monitor.cpp
 )
@@ -29,7 +31,7 @@ target_include_directories(${PROJECT_NAME}
 		$<INSTALL_INTERFACE:include>
 )
 target_link_libraries(${PROJECT_NAME} Qt5::Core)
-ament_target_dependencies(${PROJECT_NAME} rclcpp yds_interfaces)
+ament_target_dependencies(${PROJECT_NAME} rclcpp rclcpp_lifecycle yds_interfaces)
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
 	target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra -Wpedantic)
@@ -39,8 +41,6 @@ endif()
 
 if(BUILD_TESTING)
 	find_package(ament_cmake_gtest REQUIRED)
-	find_package(rclcpp_lifecycle REQUIRED)
-
 	ament_add_gtest(yds_ros2_test
 		test/component_status_node_test.cpp
 		test/component_status_test.cpp
@@ -72,6 +72,6 @@ install(
 )
 
 ament_export_targets(export_${PROJECT_NAME} HAS_LIBRARY_TARGET)
-ament_export_dependencies(Qt5Core rclcpp yds_interfaces)
+ament_export_dependencies(Qt5Core rclcpp rclcpp_lifecycle yds_interfaces)
 
 ament_package()

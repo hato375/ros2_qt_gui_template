@@ -8,6 +8,7 @@
 #include <sample_processor/sample_lifecycle_processor_error_codes.h>
 #include <sample_processor/sample_lifecycle_processor_node.h>
 #include <yds/ros2/component_status_node.h>
+#include <yds/ros2/lifecycle_component_status_node.h>
 #include <yds/ros2/repeated_event_rate_limiter.h>
 
 namespace {
@@ -32,6 +33,16 @@ public:
 			"external_regular_component_status_node",
 			QStringLiteral("external-regular-1"),
 			QStringLiteral("external_regular/status")) {}
+};
+
+class ExternalLifecycleComponentStatusNode final
+	: public yds::ros2::LifecycleComponentStatusNode {
+public:
+	ExternalLifecycleComponentStatusNode()
+		: LifecycleComponentStatusNode(
+			"external_lifecycle_component_status_node",
+			QStringLiteral("external-lifecycle-1"),
+			QStringLiteral("external_lifecycle/status")) {}
 };
 
 TEST(SampleProcessorPublicApiTest, DerivesFromInstalledRegularStatusNode) {
@@ -63,6 +74,22 @@ TEST(SampleProcessorPublicApiTest, DerivesFromInstalledLifecycleNode) {
 	EXPECT_EQ(
 		node->componentStatus().message,
 		QStringLiteral("External processor configuration failed"));
+}
+
+TEST(SampleProcessorPublicApiTest, DerivesFromInstalledLifecycleStatusNode) {
+	auto node = std::make_shared<ExternalLifecycleComponentStatusNode>();
+
+	EXPECT_TRUE(node->setComponentStatus(
+		yds::ros2::ComponentState::kReady,
+		0,
+		QStringLiteral("External lifecycle node ready")));
+
+	EXPECT_EQ(node->componentStatus().state, yds::ros2::ComponentState::kReady);
+	EXPECT_EQ(node->componentStatus().errorCode, 0);
+	EXPECT_EQ(
+		node->componentStatus().message,
+		QStringLiteral("External lifecycle node ready"));
+	EXPECT_EQ(node->componentId(), QStringLiteral("external-lifecycle-1"));
 }
 
 TEST(SampleProcessorPublicApiTest, UsesInstalledRepeatedEventRateLimiter) {

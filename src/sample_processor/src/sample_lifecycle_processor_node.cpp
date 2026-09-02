@@ -12,7 +12,6 @@
 #include <rcl_interfaces/msg/parameter_descriptor.hpp>
 
 #include <yds/ros2/component_status.h>
-#include <yds/ros2/component_status_parameters.h>
 
 namespace {
 
@@ -37,7 +36,12 @@ namespace sampleprocessor {
 
 SampleLifecycleProcessorNode::SampleLifecycleProcessorNode(
 	const rclcpp::NodeOptions& options)
-	: rclcpp_lifecycle::LifecycleNode("sample_lifecycle_processor_node", options),
+	: LifecycleComponentStatusNode(
+		  "sample_lifecycle_processor_node",
+		  QStringLiteral("sample-lifecycle-processor-1"),
+		  QStringLiteral("sample_lifecycle_processor/status"),
+		  std::chrono::milliseconds(1000),
+		  options),
 	  processingIntervalMs_(declare_parameter<std::int64_t>(
 		  "processing_interval_ms",
 		  1000,
@@ -45,21 +49,12 @@ SampleLifecycleProcessorNode::SampleLifecycleProcessorNode(
 	  processedCount_(0),
 	  transitionErrorCode_(0),
 	  transitionErrorMessage_(),
-	  statusPublisher_(),
 	  processingTimer_() {
 	if (processingIntervalMs_ < kMinimumIntervalMs ||
 		processingIntervalMs_ > kMaximumIntervalMs) {
 		throw std::out_of_range(
 			"processing_interval_ms must be between 100 and 600000 milliseconds");
 	}
-	statusPublisher_ = std::make_unique<yds::ros2::ComponentStatusPublisher>(
-		*this,
-		yds::ros2::declareComponentStatusPublisherParameters(
-			*this,
-			{
-				QStringLiteral("sample-lifecycle-processor-1"),
-				QStringLiteral("sample_lifecycle_processor/status"),
-				std::chrono::milliseconds(1000)}));
 	processingTimer_ = create_wall_timer(
 		std::chrono::milliseconds(processingIntervalMs_),
 		[this]() {
@@ -75,10 +70,6 @@ std::int64_t SampleLifecycleProcessorNode::processingIntervalMs() const noexcept
 
 std::uint64_t SampleLifecycleProcessorNode::processedCount() const noexcept {
 	return processedCount_.load();
-}
-
-yds::ros2::ComponentStatus SampleLifecycleProcessorNode::componentStatus() const {
-	return statusPublisher_->status();
 }
 
 bool SampleLifecycleProcessorNode::configureProcessor(QString&) {
@@ -264,7 +255,7 @@ SampleLifecycleProcessorNode::CallbackReturn SampleLifecycleProcessorNode::on_er
 
 void SampleLifecycleProcessorNode::process() noexcept {
 	++processedCount_;
-	statusPublisher_->setStatus(
+	setComponentStatus(
 		yds::ros2::ComponentState::kRunning,
 		0,
 		QStringLiteral("Processed cycle %1").arg(processedCount_.load()));
@@ -274,7 +265,7 @@ bool SampleLifecycleProcessorNode::updateComponentStatus(
 	yds::ros2::ComponentState state,
 	qint32 errorCode,
 	const QString& message) noexcept {
-	if (!statusPublisher_->setStatus(state, errorCode, message)) {
+	if (!setComponentStatus(state, errorCode, message)) {
 		RCLCPP_ERROR(get_logger(), "Failed to publish lifecycle component status");
 		return false;
 	}

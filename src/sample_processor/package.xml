@@ -4,7 +4,7 @@
 <package format="3">
 	<name>sample_processor</name>
 	<version>0.1.0</version>
-	<description>通常ノードとLifecycleノードでComponentStatusPublisherを利用するサンプル</description>
+	<description>通常ノードとLifecycleノードで共通状態通知基底クラスを利用するサンプル</description>
 	<maintainer email="developer@example.com">Developer</maintainer>
 	<license>Apache-2.0</license>
 

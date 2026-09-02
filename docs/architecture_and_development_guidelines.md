@@ -67,18 +67,18 @@ ROS 2 Lifecycleを採用する場合も、Lifecycle状態、トピック受信�
 ROSのゼロ時刻は無効な`QDateTime`へ変換し、受信時刻で補完するか未設定として扱うかは利用側が
 決定します。
 
-コンポーネント状態を送信するcamera、PLCなどのノードは、共通基底クラス
-`yds::ros2::ComponentStatusNode`を継承できます。派生ノードは`setComponentStatus()`で状態を更新し、
-共通基底クラスが変更時の即時通知と最新状態の定期通知を行います。利用方法とパラメータは
-`docs/component_status_node_guide.md`を参照してください。
+コンポーネント状態を送信するcamera、PLCなどのノードは、通常ノードでは共通基底クラス
+`yds::ros2::ComponentStatusNode`、Lifecycle Nodeでは`yds::ros2::LifecycleComponentStatusNode`を
+継承できます。派生ノードは`setComponentStatus()`で状態を更新し、共通基底クラスが変更時の即時通知と
+最新状態の定期通知を行います。利用方法とパラメータは`docs/component_status_node_guide.md`を参照して
+ください。
 
 状態管理とPublish処理の本体は`yds::ros2::ComponentStatusPublisher`です。
-`ComponentStatusNode`は通常の`rclcpp::Node`向けの便利クラスとして、ROSパラメータを解決して
-Publisherへ委譲します。別の基底クラスを持つノードは、`ComponentStatusPublisher`をメンバーとして
-所有します。Lifecycle Nodeでは`rclcpp_lifecycle::LifecycleNode`を継承したままPublisherを所有し、
-Inactive中も死活確認のため定期通知を継続します。Lifecycle状態からコンポーネント状態への自動変換は
-行わず、設備や機能の実態に応じてLifecycleコールバックから明示的に状態を設定します。両方のノードで
-同じROSパラメータを使用する場合は、`declareComponentStatusPublisherParameters()`で設定を解決します。
+`ComponentStatusNode`と`LifecycleComponentStatusNode`は、それぞれ通常ノードとLifecycle Nodeに固有の
+構築、ROSパラメータの解決、Publisherの所有を吸収します。別の基底クラスを持つノードは、
+`ComponentStatusPublisher`をメンバーとして所有します。Lifecycle NodeではInactive中も死活確認のため
+定期通知を継続します。Lifecycle状態からコンポーネント状態への自動変換は行わず、設備や機能の実態に
+応じてLifecycleコールバックから明示的に状態を設定します。
 ComponentStatusの定義外状態はPublisherで拒否します。状態とエラーコード、メッセージの意味的な不整合は
 警告しますが、設備固有のコード体系を壊さないよう共通層では自動修正しません。
 Supervisorは受信自体を死活監視へ記録したうえで、信頼できないComponentStatusを`UNKNOWN`へ縮退し、

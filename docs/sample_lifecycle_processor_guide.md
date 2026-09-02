@@ -2,9 +2,10 @@
 
 ## 1. 目的
 
-`sample_lifecycle_processor`は、`rclcpp_lifecycle::LifecycleNode`へ
-`yds::ros2::ComponentStatusPublisher`を組み込む例です。Lifecycle状態、処理の実行状態、
-およびSupervisorが監視する通信状態を別々に扱います。
+`sample_lifecycle_processor`は、`yds::ros2::LifecycleComponentStatusNode`を継承してLifecycle Nodeへ
+コンポーネント状態通知を組み込む例です。共通基底クラスがLifecycle Node固有の構築、状態Publisherの
+所有、パラメータ処理を吸収し、Lifecycle状態、処理の実行状態、およびSupervisorが監視する通信状態は
+別々に扱います。
 
 | Lifecycle遷移 | ComponentStatus | 処理タイマー |
 |---|---|---|
@@ -110,8 +111,8 @@ colcon test-result --verbose
 | `component_status.status_topic` | `sample_lifecycle_processor/status` | 空文字不可 | 状態通知トピック |
 | `component_status.publish_interval_ms` | 1000 | 100～600000 | Lifecycle状態に依存しない通知周期 |
 
-ComponentStatus設定は`declareComponentStatusPublisherParameters()`で宣言・検証します。通常ノードと
-Lifecycle Nodeで同じパラメータ構造を利用できます。
+ComponentStatus設定は`LifecycleComponentStatusNode`が宣言・検証します。通常ノード用の
+`ComponentStatusNode`と同じパラメータ構造を利用できます。
 
 ## 6. 実案件へ適用する場合
 
